@@ -12,7 +12,7 @@ export default function FaqSection() {
   };
 
   return (
-    <section className="mt-24 mb-24 max-w-4xl mx-auto px-4">
+    <section id="faq-section" className="mt-24 mb-24 max-w-4xl mx-auto px-4 scroll-mt-24">
       <div className="flex flex-col items-center mb-16 text-center">
         <div className="w-16 h-16 bg-blue-600 rounded-[24px] flex items-center justify-center text-white mb-6 shadow-xl rotate-3">
           <HelpCircle size={32} />

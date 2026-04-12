@@ -1,0 +1,307 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int        @id @default(autoincrement())
+  email     String?    @unique
+  phone     String     @unique
+  password  String?
+  role      UserRole   @default(USER)
+  name      String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now()) @updatedAt
+  
+  bookings  Booking[]
+  wallet    Wallet?    // 🚀 MỚI: Liên kết User với Ví của họ (Nếu họ là PARTNER)
+  cars      Car[]
+  reviews   Review[]   // 🚀 THÊM MỚI: Danh sách các đánh giá khách hàng đã viết
+}
+
+model Car {
+  id            Int          @id @default(autoincrement())
+  name          String
+  location      Location     @default(HaNoi)
+  priceOriginal Float
+  priceDiscount Float
+  brand         Brand        @default(Toyota)
+  category      Category     @default(Sedan)
+  tier          Tier         @default(Standard)
+  transmission  Transmission @default(Automatic)
+  fuel          Fuel         @default(Gasoline)
+  image         String
+  gallery       String[]     @default([])
+  seats         Int          @default(4)
+  address       String?
+  amenities     String[]     @default([])
+  deliveryFee   Float        @default(0)
+  requirements  String?
+  rules         String?
+  
+  ownerType     OwnerType    @default(COMPANY) // 
+  ownerName     String?      // Tên chủ xe 
+  ownerPhone    String?      // SĐT chủ xe
+  commission    Int?         @default(20) // Phí hoa hồng web thu (vd: 20%)
+  status        CarStatus    @default(APPROVED)
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+
+  bookings      Booking[]
+  blockedDates  BlockedDate[]
+  
+  walletId      Int?      
+  wallet        Wallet?      @relation(fields: [walletId], references: [id])
+  userId        Int?
+  user          User?        @relation(fields: [userId], references: [id])
+  licensePlate  String?  // Thêm cột lưu Biển số xe
+  ownerCCCD     String?  // Thêm cột lưu CCCD chủ xe
+  description String?  @db.Text
+  
+  reviews       Review[]     // Các đánh giá dành cho xe này
+}
+
+model Booking {
+  id              Int           @id @default(autoincrement())
+  depositAmount   Float         @default(0)
+  customerName    String?
+  customerPhone   String?
+  startDate       DateTime
+  endDate         DateTime
+  totalPrice      Float
+  status          BookingStatus @default(PENDING)
+  note            String?
+  cancelReason    String?
+  promoCode       String?
+  paymentMethod   PaymentMethod @default(DEPOSIT)
+  paymentStatus   PaymentStatus @default(PENDING)
+  deliveryAddress String?
+  deliveryFee     Float         @default(0)
+  isDelivery      Boolean       @default(false)
+  
+  userId          Int
+  carId           Int
+  user            User          @relation(fields: [userId], references: [id])
+  car             Car           @relation(fields: [carId], references: [id])
+  
+  transactions    Transaction[] // 🚀 MỚI: Liên kết với giao dịch để đối soát
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
+
+  review          Review?       // 🚀 THÊM MỚI: 1 cuốc xe chỉ có tối đa 1 đánh giá
+}
+
+model Promotion {
+  id          Int      @id @default(autoincrement())
+  title       String
+  code        String   @unique
+  discount    Int
+  description String
+  isActive    Boolean  @default(true)
+  type        String
+  startDate   DateTime @default(now())
+  expiryDate  DateTime
+  createdAt   DateTime @default(now())
+}
+
+// ==========================================
+// BẢNG MỚI CHO CHỨC NĂNG HỢP TÁC CHỦ XE
+// ==========================================
+
+model BlockedDate {
+  id        String   @id @default(cuid())
+  carId     Int
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  startDate DateTime 
+  endDate   DateTime 
+  reason    String?  @default("Chủ xe sử dụng") 
+  createdAt DateTime @default(now())
+}
+
+model Wallet {
+  id            Int           @id @default(autoincrement())
+  balance       Float         @default(0) 
+  ownerName     String        
+  ownerPhone    String        @unique 
+  
+  // 🚀 THÊM MỚI: Thông tin định danh và thanh toán
+  cccd          String?       @unique
+  bankName      String?       // VD: Vietcombank
+  bankAccount   String?       // VD: 1012345678
+  bankOwnerName String?       // VD: NGUYEN VAN TOAN
+  
+  userId        Int?          @unique // Nối với bảng User để dễ lấy data khi đăng nhập
+  user          User?         @relation(fields: [userId], references: [id])
+  
+  cars          Car[]         
+  transactions  Transaction[] 
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
+}
+
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  amount      Float    
+  type        TxType   
+  status      TxStatus @default(COMPLETED) // 🚀 THÊM MỚI: Quản lý trạng thái rút tiền
+  description String?  
+  
+  walletId    Int
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  
+  bookingId   Int?     // 🚀 THÊM MỚI: Nối với Booking để biết tiền này từ cuốc nào
+  booking     Booking? @relation(fields: [bookingId], references: [id])
+
+  createdAt   DateTime @default(now())
+}
+
+// ==========================================
+// 🚀 THÊM MỚI: BẢNG LƯU TRỮ ĐÁNH GIÁ (REVIEWS)
+// ==========================================
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int      // Lưu số sao từ 1 đến 5
+  comment   String?  @db.Text // Nội dung đánh giá
+  createdAt DateTime @default(now())
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  carId     Int
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  bookingId Int      @unique
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// CÁC ENUM (KIỂU DỮ LIỆU CỐ ĐỊNH)
+// ==========================================
+
+enum UserRole {
+  USER
+  PARTNER  // 🚀 THÊM MỚI: Phân quyền cho đối tác
+  ADMIN
+}
+
+enum OwnerType {
+  COMPANY
+  PARTNER
+}
+
+enum CarStatus {
+  PENDING   
+  APPROVED  
+  REJECTED  
+  HIDDEN    
+}
+
+enum TxType {
+  EARNING   // Tiền thu nhập từ cuốc xe
+  PAYOUT    // Rút tiền về ngân hàng
+  PENALTY   // Bị phạt (nếu có)
+}
+
+enum TxStatus {
+  PENDING     // Chờ Admin duyệt (cho lệnh rút tiền)
+  COMPLETED   // Đã hoàn thành
+  FAILED      // Thất bại / Hủy
+}
+
+// Các Enum cũ giữ nguyên
+enum Location {
+  HaNoi    @map("Hà Nội")
+  TPHCM    @map("TP. Hồ Chí Minh")
+  DaNang   @map("Đà Nẵng")
+  NhaTrang @map("Nha Trang")
+  PhuQuoc  @map("Phú Quốc")
+  DaLat    @map("Đà Lạt")
+  HaLong   @map("Hạ Long")
+  VungTau  @map("Vũng Tàu")
+  CanTho   @map("Cần Thơ")
+  HoiAn    @map("Hội An")
+  Hue      @map("Huế")
+  QuyNhon  @map("Quy Nhơn")
+}
+
+enum Brand {
+  Toyota
+  VinFast
+  Hyundai
+  Ford
+  Mitsubishi
+  Kia
+  Mazda
+  Honda
+  Suzuki
+  MG
+  Peugeot
+  Mercedes
+  BMW
+  Audi
+  Lexus
+  Porsche
+  LandRover  @map("Land Rover")
+  Nissan
+  Subaru
+  Volvo
+  Volkswagen
+  Chevrolet
+  BYD
+  Khac       @map("Khác")
+}
+
+enum Category {
+  Sedan
+  SUV
+  Hatchback
+  MPV
+  Pickup    @map("Bán tải")
+  Sport     @map("Xe thể thao")
+}
+
+enum Tier {
+  Budget   @map("Bình dân")
+  Standard @map("Phổ thông")
+  Luxury   @map("Hạng sang")
+}
+
+enum Transmission {
+  Automatic @map("Tự động")
+  Manual    @map("Số sàn")
+}
+
+enum Fuel {
+  Gasoline @map("Xăng")
+  Diesel   @map("Dầu")
+  Electric @map("Điện")
+  Hybrid
+}
+
+enum BookingStatus {
+  PENDING     @map("Đang chờ")
+  CONFIRMED   @map("Đã xác nhận")
+  IN_PROGRESS @map("Đang diễn ra") 
+  RETURNED    @map("Đã trả xe")    
+  COMPLETED   @map("Hoàn thành")
+  CANCELLED   @map("Đã hủy")
+}
+
+enum PaymentStatus {
+  PENDING
+  DEPOSITED
+  PAID_FULL
+  CANCELLED
+}
+
+enum PaymentMethod {
+  DEPOSIT
+  FULL_PAY
+}

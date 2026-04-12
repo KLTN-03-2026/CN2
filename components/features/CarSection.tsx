@@ -4,7 +4,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import CarCard from "./CarCard";
-import { X, Car as CarIcon, ChevronDown, Search, MapPin, ShieldCheck } from "lucide-react";
+import { X, Car as CarIcon, ChevronDown, Search, MapPin, ShieldCheck, Users } from "lucide-react";
 
 // --- COMPONENT MENU THẢ XUỐNG CÓ TÌM KIẾM ---
 function SearchableDropdown({ label, icon: Icon, options, value, onChange, placeholder }) {
@@ -12,7 +12,6 @@ function SearchableDropdown({ label, icon: Icon, options, value, onChange, place
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef(null);
 
-  // Xử lý click ra ngoài để đóng menu
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -97,13 +96,12 @@ export default function CarSection({ title, subTitle, cars = [], showFilters = t
     transmission: "", 
     fuel: "",         
     tier: "",         
-    seats: ""         
+    seats: ""         // 🚀 Đã khai báo biến lưu số chỗ
   });
 
-  // 🚀 LẤY DANH SÁCH ĐỊA ĐIỂM & THƯƠNG HIỆU TỰ ĐỘNG TỪ DATABASE
   const availableLocations = useMemo(() => {
-    const locs = cars.map(car => car.location).filter(Boolean); // Lấy mảng location
-    return Array.from(new Set(locs)).sort(); // Lọc trùng lặp và sắp xếp theo A-Z
+    const locs = cars.map(car => car.location).filter(Boolean);
+    return Array.from(new Set(locs)).sort(); 
   }, [cars]);
 
   const availableBrands = useMemo(() => {
@@ -111,17 +109,16 @@ export default function CarSection({ title, subTitle, cars = [], showFilters = t
     return Array.from(new Set(brs)).sort(); 
   }, [cars]);
 
-  // LOGIC LỌC
+  // LOGIC LỌC DỮ LIỆU
   const filteredCars = useMemo(() => {
     return cars.filter((car) => {
-      // So sánh trực tiếp bằng dữ liệu động
       if (activeFilters.location && car.location !== activeFilters.location) return false;
       if (activeFilters.brand && car.brand !== activeFilters.brand) return false;
-      
       if (activeFilters.category && car.category !== activeFilters.category) return false;
       if (activeFilters.transmission && car.transmission !== activeFilters.transmission) return false;
       if (activeFilters.fuel && car.fuel !== activeFilters.fuel) return false;
       if (activeFilters.tier && car.tier !== activeFilters.tier) return false;
+      // 🚀 XỬ LÝ LỌC SỐ CHỖ Ở ĐÂY
       if (activeFilters.seats && car.seats !== parseInt(activeFilters.seats)) return false;
       return true;
     });
@@ -166,7 +163,7 @@ export default function CarSection({ title, subTitle, cars = [], showFilters = t
               <SearchableDropdown 
                 label="Nơi nhận xe" 
                 icon={MapPin} 
-                options={availableLocations} // 🚀 Đã đổi thành dữ liệu lấy từ DB
+                options={availableLocations} 
                 value={activeFilters.location} 
                 onChange={(val) => toggleFilter("location", val)}
                 placeholder="Tất cả địa điểm"
@@ -175,7 +172,7 @@ export default function CarSection({ title, subTitle, cars = [], showFilters = t
               <SearchableDropdown 
                 label="Hãng xe" 
                 icon={ShieldCheck} 
-                options={availableBrands}    // 🚀 Đã đổi thành dữ liệu lấy từ DB
+                options={availableBrands}    
                 value={activeFilters.brand} 
                 onChange={(val) => toggleFilter("brand", val)}
                 placeholder="Tất cả hãng xe"
@@ -207,6 +204,20 @@ export default function CarSection({ title, subTitle, cars = [], showFilters = t
 
           {/* HÀNG 3: CÁC THÔNG SỐ KHÁC */}
           <div className="flex flex-wrap gap-4 items-center">
+              
+              {/* 🚀 THÊM BỘ LỌC SỐ CHỖ Ở ĐÂY */}
+              <div className="flex bg-white p-1.5 rounded-[20px] shadow-sm border border-gray-100">
+                  {[4, 5, 7, 9, 16].map((seat) => (
+                    <button 
+                      key={seat}
+                      onClick={() => toggleFilter("seats", seat.toString())} 
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase italic transition-all flex items-center gap-1 ${activeFilters.seats === seat.toString() ? "bg-orange-500 text-white shadow-md" : "text-gray-400 hover:text-orange-500"}`}
+                    >
+                      {seat} Chỗ
+                    </button>
+                  ))}
+              </div>
+
               <div className="flex bg-white p-1.5 rounded-[20px] shadow-sm border border-gray-100">
                   <button onClick={() => toggleFilter("tier", "Luxury")} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase italic transition-all ${activeFilters.tier === "Luxury" ? "bg-blue-900 text-white shadow-md" : "text-gray-400 hover:text-blue-600"}`}>Hạng sang</button>
                   <button onClick={() => toggleFilter("tier", "Standard")} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase italic transition-all ${activeFilters.tier === "Standard" ? "bg-blue-900 text-white shadow-md" : "text-gray-400 hover:text-blue-600"}`}>Phổ thông</button>

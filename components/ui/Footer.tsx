@@ -1,16 +1,26 @@
 /* eslint-disable @next/next/no-img-element */
+"use client"; // 🚀 ĐÃ THÊM USE CLIENT ĐỂ DÙNG HOOK
+
 import Link from "next/link";
+import { usePathname } from "next/navigation"; // 🚀 ĐÃ THÊM IMPORT
 import { 
   Car, PhoneCall, Mail, MapPin, Facebook, 
   Youtube, Instagram, Linkedin, ChevronRight, ShieldCheck 
 } from "lucide-react";
 
 export default function Footer() {
+  const pathname = usePathname(); // 🚀 KHỞI TẠO PATHNAME
+
+  // 🚀 ẨN FOOTER NẾU LÀ TRANG ADMIN
+  if (pathname.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <footer className="print:hidden bg-white border-t border-gray-100 pt-16 pb-8 font-sans">
       <div className="container mx-auto px-4">
         
-        {/* ĐÃ SỬA: Dùng 4 cột chia đều nhau (lg:grid-cols-4) đảm bảo dàn ngang chuẩn xác */}
+        {/* Dùng 4 cột chia đều nhau (lg:grid-cols-4) đảm bảo dàn ngang chuẩn xác */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-16">
           
           {/* CỘT 1: BRANDING & GIỚI THIỆU */}
@@ -42,7 +52,7 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* CỘT 2: CHÍNH SÁCH CỦA KHOA */}
+          {/* CỘT 2: CHÍNH SÁCH */}
           <div>
             <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6">Chính sách</h3>
             <ul className="space-y-4">
@@ -79,7 +89,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* CỘT 3: ĐỊA ĐIỂM DỊCH VỤ CỦA KHOA */}
+          {/* CỘT 3: ĐỊA ĐIỂM DỊCH VỤ */}
           <div>
             <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6">Địa điểm dịch vụ</h3>
             <ul className="space-y-4">

@@ -4,20 +4,22 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link"; 
-import { useRouter, useSearchParams } from "next/navigation"; 
-import { useSession, signOut } from "next-auth/react"; // 🚀 NextAuth chính chủ
+import { useRouter, useSearchParams, usePathname } from "next/navigation"; 
+import { useSession, signOut } from "next-auth/react"; 
 import { 
   User, LogOut, ChevronDown, Car, CarFront, Lock, 
   Settings, LayoutDashboard, CalendarDays, Gift, Home,
-  ShieldCheck, MapPin, Info, Clock, Calendar,Handshake,
+  ShieldCheck, MapPin, Info, Clock, Calendar, Handshake, BarChart3
 } from "lucide-react";
 import AuthModal from "@/components/features/AuthModal"; 
 
 export default function Navbar() {
+  // 🚀 1. KHAI BÁO TẤT CẢ HOOKS Ở ĐẦY TIÊN (Rules of Hooks)
+  const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // 🚀 NGUỒN SỰ THẬT DUY NHẤT: Lấy từ Session Cookie của NextAuth
+  // Lấy dữ liệu từ Session Cookie của NextAuth
   const { data: session, status } = useSession();
   const user = session?.user;
 
@@ -37,7 +39,13 @@ export default function Navbar() {
     }
   }, [searchParams]);
 
-  // 🚀 HÀM ĐĂNG XUẤT: Xóa sạch Cookie và đưa về trang chủ
+  // 🚀 2. ĐẶT EARLY RETURN Ở ĐÂY (SAU KHI ĐÃ GỌI HẾT HOOKS)
+  // Nếu đang ở đường dẫn /admin... thì ẩn Navbar này đi
+  if (pathname?.startsWith("/admin")) {
+    return null; 
+  }
+
+  // 🚀 3. CÁC HÀM XỬ LÝ SỰ KIỆN
   const handleLogout = async () => {
     setShowDropdown(false);
     // Xóa nốt localStorage nếu lỡ còn sót rác cũ
@@ -52,6 +60,7 @@ export default function Navbar() {
 
   if (!isMounted) return <nav className="h-16 bg-white border-b shadow-sm" />;
 
+  // 🚀 4. KẾT QUẢ RENDER (JSX)
   return (
     <>
       <nav className="print:hidden bg-white/90 border-b sticky top-0 z-[100] shadow-sm backdrop-blur-md">
@@ -65,7 +74,7 @@ export default function Navbar() {
             <span className="text-xl font-black text-blue-900 tracking-tighter uppercase italic">ViVuCar</span>
           </Link>
 
-          {/* MENU CHÍNH: KHÔI PHỤC ĐẦY ĐỦ CÁC MỤC CỦA BẠN */}
+          {/* MENU CHÍNH */}
           <div className="hidden lg:flex items-center gap-3">
             <div className="flex items-center gap-1 bg-gray-50 border border-gray-100 p-1.5 rounded-full text-[10px] font-black uppercase italic text-gray-400 tracking-widest">
               
@@ -100,7 +109,7 @@ export default function Navbar() {
             </div>         
           </div>
 
-          {/* CỤM TÀI KHOẢN: KIỂM TRA TRẠNG THÁI STATUS */}
+          {/* CỤM TÀI KHOẢN */}
           <div className="flex items-center gap-2">
             {status === "authenticated" && user ? (
               <div className="relative">
@@ -143,18 +152,19 @@ export default function Navbar() {
                               <Gift size={18} /> QUẢN TRỊ MÃ ƯU ĐÃI
                             </Link>
                             <Link href="/admin/approve-cars" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
-  <Handshake size={18} /> QUẢN LÝ HỢP TÁC
-</Link>
-                            
+                              <Handshake size={18} /> QUẢN LÝ HỢP TÁC
+                            </Link>
+                            <Link href="/admin/reports" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
+                              <BarChart3 size={18} /> THỐNG KÊ VÀ DOANH THU
+                            </Link>
                           </>
                         )}
 
-                        {/* 2. MENU ĐỐI TÁC CHỦ XE (SỬA LẠI ĐƯỜNG DẪN CHUẨN) */}
+                        {/* 2. MENU ĐỐI TÁC CHỦ XE */}
                         <Link href="/partner/dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
                            <LayoutDashboard size={18} /> QUẢN LÝ XE CHO THUÊ
                         </Link>
                         
-
                         {/* 3. KHU VỰC CHUNG CHO USER */}
                         <Link href="/profile" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all rounded-xl border border-gray-100 uppercase italic">
                           <CalendarDays size={18} /> Chuyến đi của tôi
@@ -185,7 +195,6 @@ export default function Navbar() {
           onClose={() => setShowAuthModal(false)} 
           onSuccess={() => {
             setShowAuthModal(false);
-            // 🚀 Ép Next.js refresh lại dữ liệu server-side
             router.refresh(); 
           }} 
           initialMode={authMode} 

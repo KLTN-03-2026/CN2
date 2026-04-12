@@ -6,7 +6,7 @@ import SearchWidget from "@/components/features/SearchWidget";
 import CarSection from "@/components/features/CarSection";
 import BrandList from "@/components/features/BrandList";
 import LocationList from "@/components/features/LocationList";
-import ReviewSection from "@/components/features/ReviewSection";
+import HomeReviews from "@/components/features/HomeReviews";
 import FaqSection from "@/components/features/FaqSection";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react"; 
@@ -99,7 +99,7 @@ export default async function Home() {
 
         {/* PHẦN 4: ĐÁNH GIÁ & HỎI ĐÁP */}
         <div className="pt-10">
-           <ReviewSection />
+           <HomeReviews />
         </div>
         
         <div className="pb-10">

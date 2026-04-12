@@ -1,0 +1,356 @@
+/* eslint-disable */
+// @ts-nocheck
+"use client";
+
+import { useState, useEffect, useMemo, } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation"; 
+import { useSession } from "next-auth/react";
+import { 
+  MapPin, Settings, Fuel, Users, CreditCard, ChevronLeft, 
+  AlertCircle, ShieldCheck, CheckCircle2, FileText, Truck 
+} from "lucide-react";
+import Link from "next/link";
+import CarReviews from "@/components/features/CarReviews";
+
+// --- HELPER FUNCTIONS ---
+const formatCurrency = (amount) => {
+  if (!amount || isNaN(amount)) return "0đ";
+  return new Intl.NumberFormat("vi-VN").format(amount) + "đ";
+};
+
+const translateEnum = (value) => {
+  const map = {
+    "Automatic": "Tự động", "Manual": "Số sàn",
+    "Gasoline": "Xăng", "Diesel": "Dầu", "Electric": "Điện",
+    "Luxury": "Hạng sang", "Standard": "Phổ thông", "Budget": "Bình dân"
+  };
+  return map[value] || value;
+};
+
+export default function CarDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams(); 
+  
+  const { data: session, status } = useSession();
+  const user = session?.user;
+
+  const [car, setCar] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [startDate, setStartDate] = useState(searchParams.get("start") || "");
+  const [endDate, setEndDate] = useState(searchParams.get("end") || "");
+  const [isOverlapped, setIsOverlapped] = useState(false);
+  
+  const [isDelivery, setIsDelivery] = useState(false);
+  const [isAgreed, setIsAgreed] = useState(false);
+
+  const minDateTime = useMemo(() => new Date().toISOString().slice(0, 16), []);
+
+  useEffect(() => {
+    // 2. Fetch dữ liệu xe từ Database
+    const fetchCar = async () => {
+      try {
+        const id = params?.id;
+        if (!id) return;
+        const res = await fetch(`/api/cars/${id}`); 
+        if (res.ok) {
+          const data = await res.json();
+          setCar(data);
+        }
+      } catch (error) {
+        console.error("Lỗi fetch xe:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCar();
+  }, [params]);
+
+  // 🚀 ĐIỂM CẬP NHẬT: Kiểm tra va chạm lịch (Bao gồm Booking và BlockedDates)
+  useEffect(() => {
+    // Nếu chưa có ngày hoặc chưa có xe thì bỏ qua
+    if (!startDate || !endDate || !car) {
+      setIsOverlapped(false);
+      return;
+    }
+
+    const sNew = new Date(startDate).getTime();
+    const eNew = new Date(endDate).getTime();
+
+    // 1. Kiểm tra trùng với đơn khách hàng đã đặt (Bookings)
+    const isBookingOverlap = car.bookings?.some(b => {
+      if (b.status === "CANCELLED" || b.status === "Đã hủy") return false;
+      const sOld = new Date(b.startDate).getTime();
+      const eOld = new Date(b.endDate).getTime();
+      return sNew < eOld && eNew > sOld;
+    });
+
+    // 2. 🚀 Kiểm tra trùng với lịch chủ xe báo bận (Blocked Dates)
+    const isBlockedOverlap = car.blockedDates?.some(block => {
+      const sOld = new Date(block.startDate).getTime();
+      const eOld = new Date(block.endDate).getTime();
+      return sNew < eOld && eNew > sOld;
+    });
+
+    // Nếu trùng 1 trong 2 cái trên -> Bật cờ báo lỗi
+    setIsOverlapped(isBookingOverlap || isBlockedOverlap);
+  }, [startDate, endDate, car]);
+
+  // TÍNH TOÁN CHI PHÍ
+  const billing = useMemo(() => {
+    if (!car || !startDate || !endDate || isOverlapped) return { days: 0, rentalFee: 0, deliveryFee: 0, total: 0 };
+    const diff = new Date(endDate).getTime() - new Date(startDate).getTime();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    const finalDays = days <= 0 ? 0 : days;
+    const rentalFee = finalDays * car.priceDiscount;
+    const deliveryCost = isDelivery ? (Number(car.deliveryFee) || 0) : 0;
+    
+    return {
+      days: finalDays,
+      rentalFee,
+      deliveryFee: deliveryCost,
+      total: finalDays > 0 ? rentalFee + 120000 + deliveryCost : 0
+    };
+  }, [car, startDate, endDate, isOverlapped, isDelivery]);
+  
+
+  const handleRentNow = () => {
+    if (status === "unauthenticated") {
+      alert("Bạn cần đăng nhập để thực hiện đặt chuyến tại ViVuCar!");
+      const currentPath = window.location.pathname + window.location.search;
+      router.push(`/?auth=login&callback=${encodeURIComponent(currentPath)}`);
+      return;
+    }
+
+    if (!startDate || !endDate) return alert("Vui lòng chọn ngày nhận và trả xe!");
+    if (billing.days <= 0) return alert("Ngày trả xe phải sau ngày nhận xe ít nhất 1 ngày!");
+    if (!isAgreed) return alert("Vui lòng đọc và đồng ý với điều khoản dịch vụ!");
+    
+    router.push(`/checkout?carId=${car.id}&start=${startDate}&end=${endDate}&isDelivery=${isDelivery}`);
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black italic text-blue-600 animate-pulse uppercase tracking-tighter">Đang kết nối hệ thống...</div>;
+  if (!car) return <div className="text-center py-20 font-black uppercase italic">404 - Thông tin xe không hợp lệ!</div>;
+
+  // 🚀 BỘ GIẢI MÃ DỮ LIỆU TỪ DATABASE
+  let safeAmenities = [];
+  let safeGallery = [];
+  try { safeAmenities = typeof car.amenities === 'string' ? JSON.parse(car.amenities || "[]") : (car.amenities || []); } catch(e) {}
+  try { safeGallery = typeof car.gallery === 'string' ? JSON.parse(car.gallery || "[]") : (car.gallery || []); } catch(e) {}
+
+  const allImages = [car.image, ...safeGallery].filter(Boolean);
+  const currentImage = selectedImage || allImages[0];
+
+  return (
+    <main className="min-h-screen bg-gray-50 pb-20 pt-24 font-sans">
+      <div className="container mx-auto px-4">
+        
+        <Link href="/" className="flex items-center gap-2 text-[10px] font-black uppercase text-gray-400 mb-8 hover:text-blue-600 transition-all">
+          <ChevronLeft size={14} /> Quay lại trang chủ
+        </Link>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          
+          {/* CỘT TRÁI: HÌNH ẢNH & THÔNG SỐ */}
+          <div className="lg:col-span-2 space-y-8">
+            <div className="relative aspect-[16/9] rounded-[40px] overflow-hidden shadow-2xl border-4 border-white group">
+              <img src={currentImage} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+            </div>
+
+            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+              {allImages.map((img, i) => (
+                <button key={i} onClick={() => setSelectedImage(img)} className={`w-24 h-24 rounded-2xl overflow-hidden border-4 transition-all flex-shrink-0 ${currentImage === img ? "border-blue-600 shadow-lg shadow-blue-100" : "border-transparent opacity-60"}`}>
+                  <img src={img} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+
+            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 mb-6">
+                <span className="bg-blue-900 text-white text-[10px] font-black px-3 py-1 rounded-lg uppercase italic">{car.brand}</span>
+                <span className="bg-blue-50 text-blue-600 text-[10px] font-black px-3 py-1 rounded-lg uppercase italic">{translateEnum(car.tier)}</span>
+              </div>
+              <h1 className="text-4xl md:text-6xl font-black text-blue-900 uppercase italic tracking-tighter leading-none mb-10">{car.name}</h1>
+              
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="p-6 bg-gray-50 rounded-3xl">
+                  <Users className="mx-auto text-blue-600 mb-2" size={24}/>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sức chứa</p>
+                  <p className="font-black text-gray-800 uppercase italic text-lg">{car.seats} chỗ</p>
+                </div>
+                <div className="p-6 bg-gray-50 rounded-3xl">
+                  <Settings className="mx-auto text-blue-600 mb-2" size={24}/>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Hộp số</p>
+                  <p className="font-black text-gray-800 uppercase italic text-lg">{translateEnum(car.transmission)}</p>
+                </div>
+                <div className="p-6 bg-gray-50 rounded-3xl">
+                  <Fuel className="mx-auto text-blue-600 mb-2" size={24}/>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nhiên liệu</p>
+                  <p className="font-black text-gray-800 uppercase italic text-lg">{translateEnum(car.fuel)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* KHỐI 1: VỊ TRÍ & TÙY CHỌN GIAO NHẬN */}
+            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-gray-100">
+              <h3 className="text-2xl font-black text-blue-900 uppercase italic tracking-tighter flex items-center gap-3 mb-6">
+                <MapPin className="text-blue-600" /> Vị trí & Giao nhận
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Tự đến lấy */}
+                <label className={`cursor-pointer p-6 rounded-3xl border-2 transition-all flex flex-col gap-2 ${!isDelivery ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'}`}>
+                  <div className="flex justify-between items-center">
+                    <span className="font-black uppercase tracking-tighter text-blue-900">Tự đến nhận xe</span>
+                    <input type="radio" name="delivery" className="hidden" checked={!isDelivery} onChange={() => setIsDelivery(false)} />
+                    {!isDelivery && <CheckCircle2 className="text-blue-600 w-5 h-5" />}
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">{car.address || "Đang cập nhật địa chỉ bãi xe"}</p>
+                  <span className="text-[10px] font-black text-green-600 uppercase mt-2">Miễn phí</span>
+                </label>
+
+                {/* Giao tận nơi */}
+                <label className={`cursor-pointer p-6 rounded-3xl border-2 transition-all flex flex-col gap-2 ${(Number(car.deliveryFee) === 0 || !car.deliveryFee) ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-100' : (isDelivery ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200')}`}>
+                  <div className="flex justify-between items-center">
+                    <span className="font-black uppercase tracking-tighter text-blue-900">Giao xe tận nơi</span>
+                    <input type="radio" name="delivery" className="hidden" disabled={!Number(car.deliveryFee)} checked={isDelivery} onChange={() => setIsDelivery(true)} />
+                    {isDelivery && <CheckCircle2 className="text-blue-600 w-5 h-5" />}
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">Nhận xe tại nhà hoặc sân bay</p>
+                  <span className="text-[10px] font-black text-orange-600 uppercase mt-2">
+                    {Number(car.deliveryFee) ? `Phí giao xe: ${formatCurrency(car.deliveryFee)}` : "Không hỗ trợ giao xe"}
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* KHỐI 2: TIỆN NGHI NỔI BẬT */}
+            {safeAmenities && safeAmenities.length > 0 && (
+              <div className="bg-white p-10 rounded-[40px] shadow-sm border border-gray-100">
+                <h3 className="text-2xl font-black text-blue-900 uppercase italic tracking-tighter flex items-center gap-3 mb-6">
+                  <ShieldCheck className="text-blue-600" /> Tiện nghi xe
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {safeAmenities.map((item, index) => (
+                    <span key={index} className="px-5 py-3 bg-gray-50 text-gray-800 text-sm font-bold rounded-2xl flex items-center gap-2 border border-gray-100">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* KHỐI 3: GIẤY TỜ & ĐIỀU KHOẢN */}
+            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-gray-100">
+              <h3 className="text-2xl font-black text-blue-900 uppercase italic tracking-tighter flex items-center gap-3 mb-6">
+                <FileText className="text-blue-600" /> Giấy tờ & Điều khoản
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-6 bg-blue-50/50 rounded-3xl border border-blue-100">
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3">Giấy tờ bắt buộc</p>
+                  <p className="text-gray-700 font-medium text-sm whitespace-pre-line leading-relaxed">
+                    {car.requirements || "1. CCCD gắn chip\n2. Giấy phép lái xe hạng B1 trở lên\n3. Đặt cọc tài sản thế chấp."}
+                  </p>
+                </div>
+                <div className="p-6 bg-red-50/50 rounded-3xl border border-red-100">
+                  <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-3">Lưu ý & Phụ thu</p>
+                  <p className="text-gray-700 font-medium text-sm whitespace-pre-line leading-relaxed">
+                    {car.rules || "Không hút thuốc, không chở đồ có mùi trên xe.\nPhụ thu 100k/giờ nếu trả xe trễ."}
+                  </p>
+                </div>
+              </div>
+            </div>
+            {/*  COMPONENT ĐÁNH GIÁ Ở ĐÂY */}
+            <CarReviews reviews={car.reviews || []} />
+
+          </div>
+
+          {/* CỘT PHẢI: THANH TOÁN & LỊCH TRÌNH */}
+          <div className="lg:col-span-1">
+            <div className={`bg-white p-8 rounded-[40px] shadow-2xl border sticky top-28 transition-all ${isOverlapped ? 'border-red-500 bg-red-50/20' : 'border-blue-50'}`}>
+              <div className="mb-8">
+                <p className="text-gray-400 line-through text-xs font-bold ml-1">{formatCurrency(car.priceOriginal)}</p>
+                <p className="text-5xl font-black text-green-600 italic tracking-tighter leading-none">
+                  {formatCurrency(car.priceDiscount)}<span className="text-sm text-gray-400 font-bold not-italic ml-1">/ngày</span>
+                </p>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Thời điểm nhận</label>
+                  <input type="datetime-local" min={minDateTime} className="w-full bg-gray-50 p-4 rounded-2xl border border-gray-100 font-bold text-sm outline-none focus:border-blue-500 transition-all" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Thời điểm trả</label>
+                  <input type="datetime-local" min={startDate || minDateTime} className="w-full bg-gray-50 p-4 rounded-2xl border border-gray-100 font-bold text-sm outline-none focus:border-blue-500 transition-all" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                </div>
+              </div>
+
+              {/* BẢNG KÊ CHI PHÍ CHI TIẾT */}
+              <div className={`p-6 rounded-[32px] space-y-3 mb-6 text-white transition-all ${isOverlapped ? 'bg-gray-400 shadow-inner' : 'bg-blue-900 shadow-xl shadow-blue-100'}`}>
+                <div className="flex justify-between items-center text-[10px] opacity-70 font-black uppercase tracking-widest">
+                  <span>Giá thuê ({billing.days} ngày)</span>
+                  <span className="font-bold">{formatCurrency(billing.rentalFee)}</span>
+                </div>
+                
+                {isDelivery && (
+                  <div className="flex justify-between items-center text-[10px] opacity-70 font-black uppercase tracking-widest">
+                    <span>Phí giao xe</span>
+                    <span className="font-bold">{formatCurrency(billing.deliveryFee)}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center text-[10px] opacity-70 font-black uppercase tracking-widest">
+                  <span>Phí bảo hiểm chuyến đi</span>
+                  <span className="font-bold">{formatCurrency(120000)}</span>
+                </div>
+                <div className="border-t border-white/20 pt-4 flex justify-between items-center">
+                    <span className="font-black uppercase italic text-xs tracking-tighter">Tổng cộng</span>
+                    <span className="text-2xl font-black italic">
+                      {isOverlapped ? "LỊCH BẬN" : (billing.total > 0 ? formatCurrency(billing.total) : "0đ")}
+                    </span>
+                </div>
+              </div>
+
+              {/* 🚀 ĐIỂM SỬA CHỮ HIỂN THỊ */}
+              {isOverlapped && (
+                <div className="flex items-center gap-2 text-red-600 font-black text-[10px] uppercase italic mb-6 animate-pulse px-2">
+                  <AlertCircle size={14} /> Trùng lịch! Xe đã có người đặt hoặc chủ xe bận.
+                </div>
+              )}
+
+              {/* CHECKBOX ĐỒNG Ý ĐIỀU KHOẢN */}
+              <div className="flex items-start gap-3 mb-6 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                <input
+                  type="checkbox"
+                  id="terms-agree"
+                  checked={isAgreed}
+                  onChange={(e) => setIsAgreed(e.target.checked)}
+                  className="mt-0.5 w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                />
+                <label htmlFor="terms-agree" className="text-[11px] text-gray-600 cursor-pointer select-none leading-relaxed font-medium">
+                  Tôi đã đọc và đồng ý với các <Link href="/policies/terms" target="_blank" className="font-bold text-blue-600 hover:underline">Điều kiện giao dịch</Link>, <Link href="/policies/delivery" target="_blank" className="font-bold text-blue-600 hover:underline">Quy chế giao nhận</Link> và bản mẫu <Link href="/policies/contract" target="_blank" className="font-bold text-blue-600 hover:underline uppercase">Hợp đồng thuê xe</Link> của nền tảng ViVuCar.
+                </label>
+              </div>
+
+              {/* NÚT THANH TOÁN */}
+              <button 
+                onClick={handleRentNow}
+                disabled={isOverlapped || billing.total === 0 || !isAgreed}
+                className={`w-full py-5 rounded-3xl font-black uppercase italic tracking-tighter shadow-xl transition-all active:scale-95 ${
+                  isOverlapped || billing.total === 0 || !isAgreed 
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-blue-200 shadow-blue-100'
+                }`}
+              >
+                {isOverlapped ? "Đã có lịch bận" : (!isAgreed ? "Vui lòng đồng ý điều khoản" : "Xác nhận thuê ngay")}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
