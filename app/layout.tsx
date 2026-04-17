@@ -6,7 +6,8 @@ import "./globals.css";
 
 import Footer from "@/components/ui/Footer";
 import Navbar from "@/components/ui/Navbar"; 
-import { NextAuthProvider } from "@/components/Providers"; // 🚀 Bổ sung dòng import này
+import { NextAuthProvider } from "@/components/Providers"; 
+import Chatbot from "@/components/features/Chatbot";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,10 @@ export default function RootLayout({
           <Navbar />
           {children}
           <Footer />
+          
+          {/* GỌI CHATBOT Ở ĐÂY ĐỂ NÓ NỔI LÊN TRÊN TOÀN HỆ THỐNG */}
+          <Chatbot />
+          
         </NextAuthProvider>
       </body>
     </html>

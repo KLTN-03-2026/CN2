@@ -8,10 +8,10 @@ import Link from "next/link";
 import { 
   ChevronLeft, ShieldCheck, MapPin, Calendar, 
   Phone, User as UserIcon, AlertTriangle, CreditCard, Loader2,
-  FileText, Receipt, Car, CheckCircle2, Star // 🚀 IMPORT THÊM ICON STAR
+  FileText, Receipt, Car, CheckCircle2, Star 
 } from "lucide-react";
 
-// 🚀 IMPORT COMPONENT POPUP ĐÁNH GIÁ (Đúng chuẩn thư mục features)
+// 🚀 IMPORT COMPONENT POPUP ĐÁNH GIÁ
 import ReviewModal from "@/components/features/ReviewModal";
 
 export default function BookingDetailPage() {
@@ -23,10 +23,9 @@ export default function BookingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
-  // 🚀 THÊM STATE ĐỂ QUẢN LÝ ĐÓNG/MỞ POPUP ĐÁNH GIÁ
+  // QUẢN LÝ ĐÓNG/MỞ POPUP ĐÁNH GIÁ
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
-  // Đưa hàm fetch ra ngoài để có thể gọi lại sau khi Đánh giá xong
   const fetchBookingDetail = async () => {
     try {
       const res = await fetch(`/api/bookings/${bookingId}`);
@@ -76,36 +75,31 @@ export default function BookingDetailPage() {
   const serviceFee = booking.serviceFee || 120000; 
   const carRentalFee = booking.totalPrice - deliveryFee - serviceFee; 
   
-  const depositPaid = booking.paymentStatus === "PAID_FULL" 
-    ? booking.totalPrice 
-    : (booking.depositAmount || (booking.totalPrice * 0.3));
-    
-  const balanceDue = booking.paymentStatus === "PAID_FULL" 
-    ? 0 
-    : (booking.totalPrice - depositPaid);
+  // 🚀 SỬA LẠI LOGIC TIỀN CỌC CHUẨN XÁC HƠN
+  let depositAmount = booking.depositAmount || (booking.totalPrice * 0.3);
+  let depositPaid = 0;
+  let balanceDue = booking.totalPrice;
 
-// 🚀 KIỂM TRA PHÂN LOẠI XE
-const isCompanyCar = booking.car?.ownerType === "COMPANY" || !booking.car?.userId;
+  if (booking.paymentStatus === "PAID_FULL") {
+     depositPaid = booking.totalPrice;
+     balanceDue = 0;
+  } else if (booking.status !== "PENDING" && booking.status !== "CANCELLED") {
+     // Đã qua bước PENDING nghĩa là đã thanh toán cọc
+     depositPaid = depositAmount;
+     balanceDue = booking.totalPrice - depositPaid;
+  }
 
-// Nếu là xe nhà -> Hiện tên Công ty & Hotline. Nếu xe đối tác -> Hiện tên & SĐT đối tác.
-const ownerName = isCompanyCar 
-  ? "Hệ Thống ViVuCar" 
-  : (booking.car?.user?.name || booking.car?.ownerName || "Đối tác ViVuCar");
-  
-const ownerPhone = isCompanyCar 
-  ? "0789430618" // 👈 Chỗ này bạn có thể thay bằng số Hotline thật của đồ án
-  : (booking.car?.user?.phone || booking.car?.ownerPhone || "Chưa cập nhật");
+  // KIỂM TRA PHÂN LOẠI XE
+  const isCompanyCar = booking.car?.ownerType === "COMPANY" || !booking.car?.userId;
+  const ownerName = isCompanyCar ? "Hệ Thống ViVuCar" : (booking.car?.user?.name || booking.car?.ownerName || "Đối tác ViVuCar");
+  const ownerPhone = isCompanyCar ? "0789430618" : (booking.car?.user?.phone || booking.car?.ownerPhone || "Chưa cập nhật");
   const isHomeDelivery = deliveryFee > 0;
 
   return (
     <main className="min-h-screen bg-[#f8fafc] pb-20 pt-28 font-sans">
       <div className="container mx-auto px-4 max-w-4xl">
         
-        {/* NÚT QUAY LẠI */}
-        <button 
-          onClick={() => router.back()} 
-          className="flex items-center gap-2 text-blue-600 font-black uppercase italic text-[10px] mb-6 hover:bg-blue-50 px-4 py-2 rounded-xl w-fit transition-all"
-        >
+        <button onClick={() => router.back()} className="flex items-center gap-2 text-blue-600 font-black uppercase italic text-[10px] mb-6 hover:bg-blue-50 px-4 py-2 rounded-xl w-fit transition-all">
           <ChevronLeft size={16} /> Quay lại lịch sử
         </button>
 
@@ -131,7 +125,6 @@ const ownerPhone = isCompanyCar
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* CỘT TRÁI (2/3): THÔNG TIN XE VÀ HÓA ĐƠN */}
           <div className="md:col-span-2 space-y-6">
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100">
               <h2 className="text-lg font-black text-blue-900 uppercase italic mb-4 flex items-center gap-2">
@@ -207,12 +200,23 @@ const ownerPhone = isCompanyCar
                 </div>
 
                 <div className="pt-2 space-y-2 border-t border-dashed border-gray-200">
-                  <div className="flex justify-between items-center text-sm text-gray-500 font-bold">
-                    <span>Đã thanh toán qua web (Cọc)</span>
-                    <span className="text-green-600 flex items-center gap-1">
-                      <CheckCircle2 size={14} /> -{depositPaid.toLocaleString('vi-VN')}đ
-                    </span>
-                  </div>
+                  
+                  {/* 🚀 LOGIC KIỂM TRA ĐÃ THANH TOÁN HAY CHƯA */}
+                  {booking.status === "PENDING" ? (
+                    <div className="flex justify-between items-center text-sm text-gray-500 font-bold">
+                      <span>Tiền cọc cần thanh toán (30%)</span>
+                      <span className="text-orange-500 flex items-center gap-1">
+                        {depositAmount.toLocaleString('vi-VN')}đ
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center text-sm text-gray-500 font-bold">
+                      <span>Đã thanh toán qua web (Cọc)</span>
+                      <span className="text-green-600 flex items-center gap-1">
+                        <CheckCircle2 size={14} /> -{depositPaid.toLocaleString('vi-VN')}đ
+                      </span>
+                    </div>
+                  )}
                   
                   <div className="flex justify-between items-center bg-blue-50 p-4 rounded-2xl border border-blue-100 mt-2">
                     <div>
@@ -228,10 +232,8 @@ const ownerPhone = isCompanyCar
             </div>
           </div>
 
-          {/* CỘT PHẢI (1/3): CHỦ XE, HỢP ĐỒNG & BẢO MẬT */}
           <div className="space-y-6">
             
-            {/* THÔNG TIN CHỦ XE */}
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
               <h2 className="font-black text-blue-900 uppercase italic tracking-tighter text-lg mb-4">Thông tin liên hệ</h2>
@@ -269,7 +271,6 @@ const ownerPhone = isCompanyCar
               )}
             </div>
 
-            {/* XEM HỢP ĐỒNG ĐIỆN TỬ */}
             {booking.status !== "PENDING" && booking.status !== "CANCELLED" && (
               <div className="bg-gradient-to-br from-blue-900 to-indigo-900 p-6 rounded-[32px] text-white shadow-xl relative overflow-hidden group">
                 <FileText className="absolute -right-4 -bottom-4 w-24 h-24 text-white/10 transform group-hover:scale-110 transition-all duration-500" />
@@ -286,7 +287,6 @@ const ownerPhone = isCompanyCar
               </div>
             )}
             
-            {/* 🚀 NÚT ĐÁNH GIÁ CHUYẾN ĐI (CHỈ HIỆN KHI ĐÃ HOÀN THÀNH) */}
             {booking.status === "COMPLETED" && (
               <div className="bg-gradient-to-br from-yellow-400 to-orange-500 p-6 rounded-[32px] text-white shadow-xl shadow-orange-200 relative overflow-hidden group">
                 <Star className="absolute -right-4 -bottom-4 w-24 h-24 text-white/20 transform group-hover:scale-110 transition-all duration-500 fill-white/20" />
@@ -303,7 +303,6 @@ const ownerPhone = isCompanyCar
               </div>
             )}
 
-            {/* NÚT THANH TOÁN / HỦY ĐƠN */}
             {booking.status === "PENDING" && (
               <Link href={`/payment/${booking.id}`} className="w-full flex justify-center py-4 bg-blue-600 text-white font-black uppercase italic text-[10px] rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 mb-3">
                 Thanh toán cọc ngay
@@ -322,7 +321,6 @@ const ownerPhone = isCompanyCar
         </div>
       </div>
 
-      {/* 🚀 GỌI COMPONENT POPUP ĐÁNH GIÁ VÀO ĐÂY */}
       {booking && (
         <ReviewModal 
           isOpen={isReviewOpen}
@@ -331,7 +329,7 @@ const ownerPhone = isCompanyCar
           carId={booking.carId}
           carName={booking.car?.name || "Chuyến đi"}
           onSuccess={() => {
-            fetchBookingDetail(); // Reload lại dữ liệu trang mà không cần F5
+            fetchBookingDetail(); 
           }}
         />
       )}
