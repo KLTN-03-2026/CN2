@@ -9,7 +9,7 @@ import { useSession, signOut } from "next-auth/react";
 import { 
   User, LogOut, ChevronDown, Car, CarFront, Lock, 
   Settings, LayoutDashboard, CalendarDays, Gift, Home,
-  ShieldCheck, MapPin, Info, Clock, Calendar, Handshake, BarChart3
+  ShieldCheck, MapPin, Info, Clock, Calendar, Handshake, BarChart3, MessageSquare
 } from "lucide-react";
 import AuthModal from "@/components/features/AuthModal"; 
 
@@ -157,6 +157,9 @@ export default function Navbar() {
                             <Link href="/admin/reports" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
                               <BarChart3 size={18} /> THỐNG KÊ VÀ DOANH THU
                             </Link>
+                            <Link href="/admin/contacts" className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
+  <MessageSquare size={18} /> YÊU CẦU HỖ TRỢ
+</Link>
                           </>
                         )}
 
@@ -169,6 +172,10 @@ export default function Navbar() {
                         <Link href="/profile" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all rounded-xl border border-gray-100 uppercase italic">
                           <CalendarDays size={18} /> Chuyến đi của tôi
                         </Link>
+                        <Link href="/profile/info" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all rounded-xl border border-gray-100 uppercase italic">
+                          <User size={18} /> Thông tin cá nhân
+                        </Link>
+                        
                       </div>
 
                       <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-4 text-[10px] font-black text-red-500 bg-red-50/50 hover:bg-red-500 hover:text-white transition-all uppercase italic tracking-widest border-t border-red-50">

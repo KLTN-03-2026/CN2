@@ -38,7 +38,8 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { id, status } = body; // status: "COMPLETED" hoặc "FAILED"
+    // 🚀 BỔ SUNG: Nhận thêm biến description (lý do từ chối) từ Frontend
+    const { id, status, description } = body; 
 
     const transaction = await prisma.transaction.findUnique({
       where: { id: Number(id) }
@@ -49,22 +50,29 @@ export async function PATCH(request: Request) {
     }
 
     if (status === "COMPLETED") {
-      // Nếu DUYỆT: Chỉ cần cập nhật trạng thái (Vì tiền đã bị trừ lúc đối tác tạo yêu cầu rồi)
+      // Nếu DUYỆT: Cập nhật trạng thái
       await prisma.transaction.update({
         where: { id: Number(id) },
-        data: { status: "COMPLETED" }
+        data: { 
+          status: "COMPLETED",
+          // Nếu sau này Admin muốn ghi chú khi duyệt thành công thì vẫn lưu được
+          description: description || transaction.description 
+        }
       });
       return NextResponse.json({ success: true, message: "Đã duyệt yêu cầu rút tiền" });
 
     } else if (status === "FAILED") {
-      // 🚀 Nếu TỪ CHỐI: Cập nhật trạng thái + HOÀN TIỀN lại vào ví đối tác
-      // Lấy giá trị tuyệt đối của số tiền (vì amount đang là số âm, ví dụ: -500000)
+      // Nếu TỪ CHỐI: Cập nhật trạng thái + HOÀN TIỀN + LƯU LÝ DO
       const refundAmount = Math.abs(transaction.amount);
 
       await prisma.$transaction([
         prisma.transaction.update({
           where: { id: Number(id) },
-          data: { status: "FAILED", description: transaction.description + " (Bị từ chối - Hoàn tiền)" }
+          data: { 
+            status: "FAILED", 
+            // 🚀 BỔ SUNG: Ưu tiên lưu lý do Admin nhập, kèm thêm câu "Đã hoàn tiền" cho rõ ràng
+            description: description ? `${description} (Hệ thống đã hoàn tiền)` : (transaction.description + " - Bị từ chối và Hoàn tiền")
+          }
         }),
         prisma.wallet.update({
           where: { id: transaction.walletId },

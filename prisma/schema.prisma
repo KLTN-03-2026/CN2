@@ -59,7 +59,7 @@ model Car {
   wallet        Wallet?      @relation(fields: [walletId], references: [id])
   userId        Int?
   user          User?        @relation(fields: [userId], references: [id])
-  licensePlate  String?  // Thêm cột lưu Biển số xe
+  licensePlate  String?  @unique// Thêm cột lưu Biển số xe
   ownerCCCD     String?  // Thêm cột lưu CCCD chủ xe
   description String?  @db.Text
   
@@ -179,6 +179,16 @@ model Review {
 
   bookingId Int      @unique
   booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+model ContactMessage {
+  id        Int       @id @default(autoincrement())
+  name      String
+  phone     String
+  email     String?
+  message   String    @db.Text
+  status    MsgStatus @default(PENDING)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 }
 
 // ==========================================
@@ -304,4 +314,8 @@ enum PaymentStatus {
 enum PaymentMethod {
   DEPOSIT
   FULL_PAY
+}
+enum MsgStatus {
+  PENDING    @map("Chờ xử lý")
+  RESOLVED   @map("Đã xử lý")
 }

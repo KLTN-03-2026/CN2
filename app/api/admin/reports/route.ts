@@ -15,6 +15,7 @@ export async function GET() {
     // 1. Lấy tất cả chuyến đi hoàn thành kèm thông tin chi tiết xe và userId chủ xe
     const bookings = await prisma.booking.findMany({
       where: { status: "COMPLETED" },
+      orderBy: { endDate: 'desc' }, // 🚀 Sắp xếp mới nhất lên đầu
       include: { 
         car: { 
           select: { 
@@ -22,9 +23,16 @@ export async function GET() {
             name: true, 
             ownerType: true, 
             location: true,
-            userId: true // 🚀 Quan trọng: Dùng cái này để xác định đối tác
+            userId: true, // Dùng cái này để xác định đối tác
+            licensePlate: true // 🚀 Thêm biển số để xuất file Excel
           } 
-        } 
+        },
+        user: { // 🚀 Bắt buộc phải có để lấy tên và SĐT khách hàng cho file Excel
+          select: {
+            name: true,
+            phone: true
+          }
+        }
       }
     });
 
@@ -38,9 +46,7 @@ export async function GET() {
     bookings.forEach(b => {
       totalGmv += b.totalPrice;
       
-      // 🚀 LOGIC PHÂN LOẠI THÔNG MINH:
-      // Nếu có userId gắn với xe -> Đó là xe đối tác (PARTNER)
-      // Nếu userId trống -> Đó là xe hệ thống (COMPANY)
+      // LOGIC PHÂN LOẠI THÔNG MINH:
       const isPartnerCar = b.car.userId !== null;
       
       let sysProfit = 0;
@@ -69,12 +75,12 @@ export async function GET() {
       monthlyMap[monthKey].profitSystem += sysProfit;
       monthlyMap[monthKey].profitPartner += partProfit;
 
-      // Thống kê xe (Fix lỗi hiển thị chủ xe ở đây)
+      // Thống kê xe
       if (!carStatsMap[b.car.id]) {
         carStatsMap[b.car.id] = { 
           id: b.car.id, 
           name: b.car.name, 
-          owner: isPartnerCar ? "Xe Đối Tác" : "Xe Hệ Thống", // 🚀 Đã sửa hiển thị
+          owner: isPartnerCar ? "Xe Đối Tác" : "Xe Hệ Thống", 
           trips: 0, 
           revenue: 0 
         };
@@ -109,6 +115,9 @@ export async function GET() {
     const averageRating = reviews.length > 0 ? (totalStars / reviews.length).toFixed(1) : "0.0";
 
     const finalData = {
+      // 🚀 BỔ SUNG BIẾN NÀY ĐỂ FRONTEND LỌC ĐƯỢC NGÀY THÁNG
+      rawBookings: bookings, 
+
       kpis: {
         totalGmv,
         profitSystem,

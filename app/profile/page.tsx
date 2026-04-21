@@ -4,31 +4,25 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession, signOut } from "next-auth/react"; // 🚀 ĐIỂM MỚI: NextAuth
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import {
   Calendar, MapPin, Car, Clock, User as UserIcon,
-  ChevronRight, CreditCard, ShieldCheck, LogOut, Settings, 
-  XCircle, AlertTriangle
+  ChevronRight, CreditCard, ShieldCheck, LogOut, 
+  XCircle, AlertTriangle, Camera, FileText, Key, ClipboardCheck
 } from "lucide-react";
-import EditProfileModal from "@/components/features/EditProfileModal";
 
-// IMPORT BỘ NÃO TRUNG TÂM VÀO ĐÂY
 import { getBookingState } from "@/lib/bookingUtils";
 
 export default function ProfilePage() {
   const router = useRouter();
-  
-  // 🚀 LẤY SESSION TỪ NEXTAUTH
   const { data: session, status } = useSession();
   
   const [user, setUser] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // 🚀 STATE QUẢN LÝ MODAL HỦY CHUYẾN
   const [cancelModal, setCancelModal] = useState({
     isOpen: false,
     booking: null,
@@ -42,14 +36,10 @@ export default function ProfilePage() {
 
   useEffect(() => {
     setMounted(true);
-
-    // 1. KIỂM TRA QUYỀN TRUY CẬP
     if (status === "unauthenticated") {
       router.push("/?auth=login&callback=/profile");
       return;
     }
-
-    // 2. ĐỒNG BỘ DỮ LIỆU USER TỪ SESSION
     if (status === "authenticated" && session?.user) {
       setUser(session.user);
       fetchMyBookings(session.user.email);
@@ -86,7 +76,7 @@ export default function ProfilePage() {
     if (!hasPaid) {
       cancellationFee = 0;
       actualRefund = 0;
-      finalNoteMsg = "Hủy miễn phí (Bạn đang trong thời gian 20 phút chờ thanh toán. Hủy chuyến lúc này sẽ không phát sinh phí phạt và giúp hệ thống giải phóng lịch xe sớm).";
+      finalNoteMsg = "Hủy miễn phí (Bạn đang trong thời gian chờ thanh toán).";
     } else {
       cancellationFee = Math.max(0, actualPaidAmount - state.refundAmount);
       actualRefund = state.refundAmount;
@@ -106,14 +96,14 @@ export default function ProfilePage() {
 
   const submitCancelBooking = async () => {
     if (!cancelModal.reason.trim()) {
-      return alert("Vui lòng nhập lý do để chúng tôi cải thiện dịch vụ!");
+      return alert("Vui lòng nhập lý do hủy chuyến!");
     }
     setCancelModal(prev => ({ ...prev, isSubmitting: true }));
     const hasPaid = cancelModal.booking.paymentStatus === "DEPOSITED" || cancelModal.booking.paymentStatus === "PAID_FULL";
     
     const finalReason = hasPaid 
       ? `${cancelModal.reason} (Phí phạt: ${cancelModal.cancellationFee.toLocaleString('vi-VN')}đ | Hoàn: ${cancelModal.refundAmount.toLocaleString('vi-VN')}đ)`
-      : `${cancelModal.reason} (Hủy trong 20 phút chờ thanh toán - Miễn phí)`;
+      : `${cancelModal.reason} (Hủy miễn phí)`;
 
     try {
       const res = await fetch("/api/bookings/cancel", {
@@ -141,14 +131,17 @@ export default function ProfilePage() {
   };
 
   const handleLogout = async () => {
-    localStorage.removeItem("user"); // Xóa nốt rác cũ nếu còn
+    localStorage.removeItem("user");
     await signOut({ callbackUrl: "/" }); 
   };
 
-  // Tránh lỗi Hydration và đợi Loading Session
+  const totalBookings = bookings.length;
+  const completedBookings = bookings.filter(b => b.status === "COMPLETED").length;
+  const cancelledBookings = bookings.filter(b => b.status === "CANCELLED").length;
+
   if (!mounted || status === "loading") return (
     <div className="min-h-screen flex items-center justify-center font-black italic text-blue-600 animate-pulse uppercase">
-      Đang tải hồ sơ khách hàng...
+      Đang tải dữ liệu chuyến đi...
     </div>
   );
 
@@ -160,7 +153,6 @@ export default function ProfilePage() {
         <div className="container mx-auto px-4 max-w-6xl">
           <div className="flex flex-col lg:flex-row gap-12">
 
-            {/* CỘT TRÁI: THÔNG TIN CÁ NHÂN */}
             <aside className="w-full lg:w-1/3 space-y-6">
               <div className="bg-white p-8 rounded-[40px] shadow-sm border border-gray-100 text-center relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-blue-600"></div>
@@ -168,20 +160,79 @@ export default function ProfilePage() {
                   <img
                     src={user?.photo || `https://ui-avatars.com/api/?name=${user?.name}&background=0D47A1&color=fff`}
                     className="w-28 h-28 rounded-[32px] mx-auto border-4 border-gray-50 mb-4 object-cover shadow-lg"
+                    alt="Avatar"
                   />
                   <div className="absolute -bottom-2 -right-2 bg-green-500 w-6 h-6 rounded-full border-4 border-white"></div>
                 </div>
                 <h2 className="text-2xl font-black text-blue-900 uppercase italic tracking-tighter">{user?.name}</h2>
                 <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-8">{user?.email}</p>
 
-                <div className="space-y-3 pt-6 border-t border-dashed border-gray-100">
-                  <button onClick={() => setIsEditModalOpen(true)} className="w-full flex items-center justify-center gap-2 py-4 bg-gray-50 text-blue-900 font-black uppercase italic text-[10px] rounded-2xl hover:bg-blue-100 transition-all border border-gray-100">
-                    <Settings size={16} /> Chỉnh sửa hồ sơ
-                  </button>
-                  <div className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
-                    <span className="text-[10px] font-black text-gray-400 uppercase">Tổng chuyến đi</span>
-                    <span className="text-xl font-black text-blue-600 italic leading-none">{bookings.length}</span>
+                <div className="space-y-4 pt-6 border-t border-dashed border-gray-100">
+                  
+                  {/* CẨM NANG NHẬN XE & AN TOÀN */}
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-2xl border border-blue-100 text-left space-y-5 shadow-inner">
+                    <h3 className="text-sm font-black text-blue-900 uppercase italic tracking-tighter flex items-center gap-2 border-b border-blue-100/50 pb-3">
+                      <ShieldCheck size={18} className="text-blue-600" /> Cẩm nang hành trình
+                    </h3>
+                    
+                    {/* Quy trình nhận xe */}
+                    <div>
+                      <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <Key size={12} /> Quy trình nhận xe
+                      </p>
+                      <ul className="space-y-3">
+                        <li className="flex items-start gap-2.5 text-[11px] font-medium text-gray-700 leading-relaxed">
+                          <FileText size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                          <span><strong className="text-blue-900">1. Giấy tờ:</strong> Chuẩn bị sẵn bản gốc CCCD và GPLX (từ hạng B1/B2 trở lên) để chủ xe đối chiếu.</span>
+                        </li>
+                        <li className="flex items-start gap-2.5 text-[11px] font-medium text-gray-700 leading-relaxed">
+                          <Camera size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                          <span><strong className="text-blue-900">2. Kiểm tra:</strong> Quay phim/chụp ảnh kỹ quanh xe, vết xước cũ và vạch xăng trước khi lăn bánh.</span>
+                        </li>
+                        <li className="flex items-start gap-2.5 text-[11px] font-medium text-gray-700 leading-relaxed">
+                          <ClipboardCheck size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                          <span><strong className="text-blue-900">3. Ký nhận:</strong> Đọc kỹ các điều khoản trên biên bản bàn giao xe điện tử hoặc giấy.</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    {/* Lưu ý an toàn */}
+                    <div className="pt-4 border-t border-blue-100/50">
+                      <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <AlertTriangle size={12} /> An toàn trên mọi nẻo đường
+                      </p>
+                      <div className="bg-white/70 rounded-xl p-3.5 space-y-2.5 border border-white">
+                        <p className="text-[10px] text-gray-600 font-bold leading-relaxed flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1 shrink-0"></span>
+                          Tuyệt đối tuân thủ tốc độ, biển báo và KHÔNG sử dụng rượu bia khi lái xe.
+                        </p>
+                        <p className="text-[10px] text-gray-600 font-bold leading-relaxed flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1 shrink-0"></span>
+                          Nếu xảy ra va chạm hoặc sự cố, giữ nguyên hiện trường và gọi ngay Hotline <span className="text-blue-600 font-black whitespace-nowrap">1900 8888</span>.
+                        </p>
+                      </div>
+                    </div>
                   </div>
+
+                  <div className="bg-gray-50 p-5 rounded-2xl space-y-4 text-left border border-gray-100">
+                    <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                      <span className="text-[10px] font-black text-gray-500 uppercase">Tổng chuyến đã đặt</span>
+                      <span className="text-2xl font-black text-blue-600 italic leading-none">{totalBookings}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black text-gray-500 uppercase flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-green-500"></span> Đã hoàn thành
+                      </span>
+                      <span className="text-xl font-black text-green-600 italic leading-none">{completedBookings}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black text-gray-500 uppercase flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-red-500"></span> Đã hủy
+                      </span>
+                      <span className="text-xl font-black text-red-500 italic leading-none">{cancelledBookings}</span>
+                    </div>
+                  </div>
+
                   <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-4 text-red-500 font-black uppercase italic text-[10px] hover:bg-red-50 rounded-2xl transition-all">
                     <LogOut size={16} /> Đăng xuất
                   </button>
@@ -197,7 +248,6 @@ export default function ProfilePage() {
               </div>
             </aside>
 
-            {/* CỘT PHẢI: LỊCH SỬ ĐẶT XE */}
             <section className="w-full lg:w-2/3">
               <h2 className="text-3xl font-black text-blue-900 uppercase italic tracking-tighter flex items-center gap-3 mb-8">
                 <Clock className="text-blue-600" size={28} /> Lịch sử chuyến đi
@@ -221,7 +271,6 @@ export default function ProfilePage() {
                     return (
                       <div key={item.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 hover:shadow-xl transition-all group">
                         
-                        {/* 🚀 THÊM LINK VÀO HÌNH ẢNH XE */}
                         <Link href={`/history/${item.id}`} className="w-full md:w-56 h-36 rounded-2xl overflow-hidden bg-gray-100 flex-shrink-0 relative block cursor-pointer">
                           <img src={item.car?.image} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="Car" />
                           <div className="absolute top-2 left-2 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-[8px] font-black uppercase text-blue-900">
@@ -232,8 +281,6 @@ export default function ProfilePage() {
                         <div className="flex-grow flex flex-col justify-between py-1">
                           <div className="flex justify-between items-start">
                             <div className="flex-grow">
-                              
-                              {/* 🚀 THÊM LINK VÀO TÊN XE */}
                               <Link href={`/history/${item.id}`}>
                                 <h3 className="font-black text-xl text-blue-900 uppercase italic tracking-tighter leading-none mb-4 hover:text-blue-600 transition-colors">
                                   {item.car?.name}
@@ -293,9 +340,6 @@ export default function ProfilePage() {
                                       Quá hạn hủy
                                     </button>
                                   )}
-                                  <span className="text-[8px] text-gray-400 italic text-right max-w-[140px] leading-tight mt-1">
-                                    * {state.cancelMessage}
-                                  </span>
                                 </div>
                               )}
                             </div>
@@ -311,7 +355,6 @@ export default function ProfilePage() {
                               <p className="text-[9px] font-black text-gray-300 uppercase italic mb-1">Hệ thống ViVuCar</p>
                             </div>
                             
-                            {/* 🚀 THÊM NÚT XEM CHI TIẾT KẾ BÊN TỔNG TIỀN */}
                             <div className="flex flex-col items-end gap-2">
                               <p className="font-black text-blue-600 text-2xl italic tracking-tighter leading-none">
                                 {item.totalPrice?.toLocaleString('vi-VN')}đ
@@ -330,18 +373,6 @@ export default function ProfilePage() {
             </section>
           </div>
         </div>
-
-        {/* MODAL SỬA HỒ SƠ */}
-        <EditProfileModal 
-          isOpen={isEditModalOpen} 
-          onClose={() => setIsEditModalOpen(false)} 
-          user={user} 
-          onUpdate={(u) => { 
-            setUser(u); 
-            // 🚀 Reload để Session của NextAuth nhận diện thông tin mới (nếu có update database)
-            window.location.reload(); 
-          }} 
-        />
       </main>
 
       {/* MODAL HỦY CHUYẾN XỊN SÒ */}

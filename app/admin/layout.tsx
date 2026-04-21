@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { 
   ClipboardList, CarFront, Handshake, 
-  Gift, BarChart3, LogOut, ShieldCheck 
+  Gift, BarChart3, LogOut, ShieldCheck, MessageSquare
 } from "lucide-react";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -24,6 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { name: "Quản lý Hợp tác", icon: <Handshake size={20} />, path: "/admin/approve-cars" },
     { name: "Quản trị Mã ưu đãi", icon: <Gift size={20} />, path: "/admin/promotions" },
     { name: "Thống kê & Doanh thu", icon: <BarChart3 size={20} />, path: "/admin/reports" },
+    { name: "Yêu cầu hỗ trợ", icon: <MessageSquare size={20} />, path: "/admin/contacts" },
   ];
 
   return (
