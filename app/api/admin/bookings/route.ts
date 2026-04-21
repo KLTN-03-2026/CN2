@@ -6,6 +6,18 @@ import { sendBookingEmail } from "@/lib/mail";
 
 export async function GET() {
   try {
+    // 🚀 DỌN RÁC TRƯỚC KHI LẤY DỮ LIỆU RA CHO ADMIN XEM
+    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
+    await prisma.booking.updateMany({
+      where: {
+        status: "PENDING",
+        createdAt: { lt: twentyMinutesAgo }
+      },
+      data: {
+        status: "CANCELLED",
+        note: "Hệ thống tự động hủy do quá hạn thanh toán 20 phút."
+      }
+    });
     const bookings = await prisma.booking.findMany({
       include: { 
         user: {

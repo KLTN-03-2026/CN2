@@ -7,12 +7,12 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { 
   MapPin, Settings, Fuel, Users, CreditCard, ChevronLeft, 
-  AlertCircle, ShieldCheck, CheckCircle2, FileText, Truck 
+  AlertCircle, ShieldCheck, CheckCircle2, FileText, Truck,
+  Gift, Loader2, X // 🚀 Bổ sung icon cho Mã giảm giá
 } from "lucide-react";
 import Link from "next/link";
 import CarReviews from "@/components/features/CarReviews";
 
-// --- HELPER FUNCTIONS ---
 const formatCurrency = (amount) => {
   if (!amount || isNaN(amount)) return "0đ";
   return new Intl.NumberFormat("vi-VN").format(amount) + "đ";
@@ -33,8 +33,7 @@ export default function CarDetailPage() {
   const searchParams = useSearchParams(); 
   
   const { data: session, status } = useSession();
-  const user = session?.user;
-
+  
   const [car, setCar] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,10 +44,14 @@ export default function CarDetailPage() {
   const [isDelivery, setIsDelivery] = useState(false);
   const [isAgreed, setIsAgreed] = useState(false);
 
+  // 🚀 LOGIC MÃ GIẢM GIÁ (Chuyển từ trang Checkout sang đây)
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [isValidating, setIsValidating] = useState(false);
+
   const minDateTime = useMemo(() => new Date().toISOString().slice(0, 16), []);
 
   useEffect(() => {
-    // 2. Fetch dữ liệu xe từ Database
     const fetchCar = async () => {
       try {
         const id = params?.id;
@@ -67,18 +70,14 @@ export default function CarDetailPage() {
     fetchCar();
   }, [params]);
 
-  // 🚀 ĐIỂM CẬP NHẬT: Kiểm tra va chạm lịch (Bao gồm Booking và BlockedDates)
   useEffect(() => {
-    // Nếu chưa có ngày hoặc chưa có xe thì bỏ qua
     if (!startDate || !endDate || !car) {
       setIsOverlapped(false);
       return;
     }
-
     const sNew = new Date(startDate).getTime();
     const eNew = new Date(endDate).getTime();
 
-    // 1. Kiểm tra trùng với đơn khách hàng đã đặt (Bookings)
     const isBookingOverlap = car.bookings?.some(b => {
       if (b.status === "CANCELLED" || b.status === "Đã hủy") return false;
       const sOld = new Date(b.startDate).getTime();
@@ -86,33 +85,67 @@ export default function CarDetailPage() {
       return sNew < eOld && eNew > sOld;
     });
 
-    // 2. 🚀 Kiểm tra trùng với lịch chủ xe báo bận (Blocked Dates)
     const isBlockedOverlap = car.blockedDates?.some(block => {
       const sOld = new Date(block.startDate).getTime();
       const eOld = new Date(block.endDate).getTime();
       return sNew < eOld && eNew > sOld;
     });
 
-    // Nếu trùng 1 trong 2 cái trên -> Bật cờ báo lỗi
     setIsOverlapped(isBookingOverlap || isBlockedOverlap);
   }, [startDate, endDate, car]);
 
-  // TÍNH TOÁN CHI PHÍ
+  // 🚀 Hàm xử lý áp dụng mã giảm giá
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setIsValidating(true);
+    try {
+      const res = await fetch("/api/promotions/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: promoCode.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAppliedPromo(data);
+      } else {
+        alert(data.error || "Mã không hợp lệ");
+        setAppliedPromo(null);
+      }
+    } catch (e) {
+      alert("Lỗi kết nối máy chủ");
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
   const billing = useMemo(() => {
-    if (!car || !startDate || !endDate || isOverlapped) return { days: 0, rentalFee: 0, deliveryFee: 0, total: 0 };
+    if (!car || !startDate || !endDate || isOverlapped) return { days: 0, rentalFee: 0, deliveryFee: 0, discount: 0, total: 0 };
     const diff = new Date(endDate).getTime() - new Date(startDate).getTime();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
     const finalDays = days <= 0 ? 0 : days;
     const rentalFee = finalDays * car.priceDiscount;
     const deliveryCost = isDelivery ? (Number(car.deliveryFee) || 0) : 0;
     
+    // 🚀 Tính toán số tiền được giảm
+    let discountAmount = 0;
+    if (appliedPromo) {
+      if (appliedPromo.type === "PERCENT") {
+        discountAmount = (rentalFee * appliedPromo.discount) / 100;
+      } else {
+        discountAmount = appliedPromo.discount;
+      }
+    }
+
+    const total = rentalFee + 120000 + deliveryCost - discountAmount;
+    
     return {
       days: finalDays,
       rentalFee,
       deliveryFee: deliveryCost,
-      total: finalDays > 0 ? rentalFee + 120000 + deliveryCost : 0
+      discount: discountAmount,
+      total: total < 0 ? 0 : total
     };
-  }, [car, startDate, endDate, isOverlapped, isDelivery]);
+  }, [car, startDate, endDate, isOverlapped, isDelivery, appliedPromo]);
   
 
   const handleRentNow = () => {
@@ -127,13 +160,14 @@ export default function CarDetailPage() {
     if (billing.days <= 0) return alert("Ngày trả xe phải sau ngày nhận xe ít nhất 1 ngày!");
     if (!isAgreed) return alert("Vui lòng đọc và đồng ý với điều khoản dịch vụ!");
     
-    router.push(`/checkout?carId=${car.id}&start=${startDate}&end=${endDate}&isDelivery=${isDelivery}`);
+    // 🚀 Truyền TẤT CẢ trạng thái (Ngày, Giao xe, Mã KM) qua URL sang trang Checkout
+    const promoQuery = appliedPromo ? `&promo=${appliedPromo.code}` : "";
+    router.push(`/checkout?carId=${car.id}&start=${startDate}&end=${endDate}&isDelivery=${isDelivery}${promoQuery}`);
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black italic text-blue-600 animate-pulse uppercase tracking-tighter">Đang kết nối hệ thống...</div>;
   if (!car) return <div className="text-center py-20 font-black uppercase italic">404 - Thông tin xe không hợp lệ!</div>;
 
-  // 🚀 BỘ GIẢI MÃ DỮ LIỆU TỪ DATABASE
   let safeAmenities = [];
   let safeGallery = [];
   try { safeAmenities = typeof car.amenities === 'string' ? JSON.parse(car.amenities || "[]") : (car.amenities || []); } catch(e) {}
@@ -145,14 +179,10 @@ export default function CarDetailPage() {
   return (
     <main className="min-h-screen bg-gray-50 pb-20 pt-24 font-sans">
       <div className="container mx-auto px-4">
-        
         <Link href="/" className="flex items-center gap-2 text-[10px] font-black uppercase text-gray-400 mb-8 hover:text-blue-600 transition-all">
           <ChevronLeft size={14} /> Quay lại trang chủ
         </Link>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          
-          {/* CỘT TRÁI: HÌNH ẢNH & THÔNG SỐ */}
           <div className="lg:col-span-2 space-y-8">
             <div className="relative aspect-[16/9] rounded-[40px] overflow-hidden shadow-2xl border-4 border-white group">
               <img src={currentImage} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
@@ -172,7 +202,6 @@ export default function CarDetailPage() {
                 <span className="bg-blue-50 text-blue-600 text-[10px] font-black px-3 py-1 rounded-lg uppercase italic">{translateEnum(car.tier)}</span>
               </div>
               <h1 className="text-4xl md:text-6xl font-black text-blue-900 uppercase italic tracking-tighter leading-none mb-10">{car.name}</h1>
-              
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div className="p-6 bg-gray-50 rounded-3xl">
                   <Users className="mx-auto text-blue-600 mb-2" size={24}/>
@@ -192,14 +221,11 @@ export default function CarDetailPage() {
               </div>
             </div>
 
-            {/* KHỐI 1: VỊ TRÍ & TÙY CHỌN GIAO NHẬN */}
             <div className="bg-white p-10 rounded-[40px] shadow-sm border border-gray-100">
               <h3 className="text-2xl font-black text-blue-900 uppercase italic tracking-tighter flex items-center gap-3 mb-6">
                 <MapPin className="text-blue-600" /> Vị trí & Giao nhận
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
-                {/* Tự đến lấy */}
                 <label className={`cursor-pointer p-6 rounded-3xl border-2 transition-all flex flex-col gap-2 ${!isDelivery ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'}`}>
                   <div className="flex justify-between items-center">
                     <span className="font-black uppercase tracking-tighter text-blue-900">Tự đến nhận xe</span>
@@ -209,8 +235,6 @@ export default function CarDetailPage() {
                   <p className="text-sm font-medium text-gray-600">{car.address || "Đang cập nhật địa chỉ bãi xe"}</p>
                   <span className="text-[10px] font-black text-green-600 uppercase mt-2">Miễn phí</span>
                 </label>
-
-                {/* Giao tận nơi */}
                 <label className={`cursor-pointer p-6 rounded-3xl border-2 transition-all flex flex-col gap-2 ${(Number(car.deliveryFee) === 0 || !car.deliveryFee) ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-100' : (isDelivery ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200')}`}>
                   <div className="flex justify-between items-center">
                     <span className="font-black uppercase tracking-tighter text-blue-900">Giao xe tận nơi</span>
@@ -225,7 +249,6 @@ export default function CarDetailPage() {
               </div>
             </div>
 
-            {/* KHỐI 2: TIỆN NGHI NỔI BẬT */}
             {safeAmenities && safeAmenities.length > 0 && (
               <div className="bg-white p-10 rounded-[40px] shadow-sm border border-gray-100">
                 <h3 className="text-2xl font-black text-blue-900 uppercase italic tracking-tighter flex items-center gap-3 mb-6">
@@ -242,7 +265,6 @@ export default function CarDetailPage() {
               </div>
             )}
 
-            {/* KHỐI 3: GIẤY TỜ & ĐIỀU KHOẢN */}
             <div className="bg-white p-10 rounded-[40px] shadow-sm border border-gray-100">
               <h3 className="text-2xl font-black text-blue-900 uppercase italic tracking-tighter flex items-center gap-3 mb-6">
                 <FileText className="text-blue-600" /> Giấy tờ & Điều khoản
@@ -250,24 +272,18 @@ export default function CarDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="p-6 bg-blue-50/50 rounded-3xl border border-blue-100">
                   <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3">Giấy tờ bắt buộc</p>
-                  <p className="text-gray-700 font-medium text-sm whitespace-pre-line leading-relaxed">
-                    {car.requirements || "1. CCCD gắn chip\n2. Giấy phép lái xe hạng B1 trở lên\n3. Đặt cọc tài sản thế chấp."}
-                  </p>
+                  <p className="text-gray-700 font-medium text-sm whitespace-pre-line leading-relaxed">{car.requirements || "1. CCCD gắn chip\n2. Giấy phép lái xe hạng B1 trở lên\n3. Đặt cọc tài sản thế chấp."}</p>
                 </div>
                 <div className="p-6 bg-red-50/50 rounded-3xl border border-red-100">
                   <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-3">Lưu ý & Phụ thu</p>
-                  <p className="text-gray-700 font-medium text-sm whitespace-pre-line leading-relaxed">
-                    {car.rules || "Không hút thuốc, không chở đồ có mùi trên xe.\nPhụ thu 100k/giờ nếu trả xe trễ."}
-                  </p>
+                  <p className="text-gray-700 font-medium text-sm whitespace-pre-line leading-relaxed">{car.rules || "Không hút thuốc, không chở đồ có mùi trên xe.\nPhụ thu 100k/giờ nếu trả xe trễ."}</p>
                 </div>
               </div>
             </div>
-            {/*  COMPONENT ĐÁNH GIÁ Ở ĐÂY */}
+            
             <CarReviews reviews={car.reviews || []} />
-
           </div>
 
-          {/* CỘT PHẢI: THANH TOÁN & LỊCH TRÌNH */}
           <div className="lg:col-span-1">
             <div className={`bg-white p-8 rounded-[40px] shadow-2xl border sticky top-28 transition-all ${isOverlapped ? 'border-red-500 bg-red-50/20' : 'border-blue-50'}`}>
               <div className="mb-8">
@@ -277,7 +293,7 @@ export default function CarDetailPage() {
                 </p>
               </div>
 
-              <div className="space-y-4 mb-8">
+              <div className="space-y-4 mb-6">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Thời điểm nhận</label>
                   <input type="datetime-local" min={minDateTime} className="w-full bg-gray-50 p-4 rounded-2xl border border-gray-100 font-bold text-sm outline-none focus:border-blue-500 transition-all" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -288,24 +304,60 @@ export default function CarDetailPage() {
                 </div>
               </div>
 
-              {/* BẢNG KÊ CHI PHÍ CHI TIẾT */}
+              {/* 🚀 Ô NHẬP MÃ ƯU ĐÃI NẰM TẠI ĐÂY */}
+              <div className="bg-gray-50 p-4 rounded-[24px] border border-dashed border-gray-200 mb-6">
+                <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block italic">Mã giảm giá</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="VÍ DỤ: BONBONNEW" 
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    className="flex-grow bg-white border border-gray-100 rounded-xl px-4 py-2 text-[10px] font-black uppercase italic outline-none focus:border-blue-600 transition-all"
+                  />
+                  <button 
+                    onClick={handleApplyPromo}
+                    disabled={isValidating || !promoCode}
+                    className="bg-blue-900 text-white px-4 rounded-xl font-black uppercase italic text-[9px] hover:bg-black transition-all active:scale-90 disabled:opacity-50"
+                  >
+                    {isValidating ? <Loader2 className="animate-spin" size={14}/> : "ÁP DỤNG"}
+                  </button>
+                </div>
+
+                {appliedPromo && (
+                  <div className="mt-3 flex justify-between items-center bg-green-50 p-2 rounded-xl border border-green-100 animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <Gift size={14} className="text-green-600" />
+                      <span className="text-[9px] font-black text-green-700 uppercase italic tracking-tighter leading-none">
+                        -{appliedPromo.discount}{appliedPromo.type === "PERCENT" ? "%" : "đ"}
+                      </span>
+                    </div>
+                    <button onClick={() => {setAppliedPromo(null); setPromoCode("");}} className="text-red-400 hover:text-red-600"><X size={14}/></button>
+                  </div>
+                )}
+              </div>
+
               <div className={`p-6 rounded-[32px] space-y-3 mb-6 text-white transition-all ${isOverlapped ? 'bg-gray-400 shadow-inner' : 'bg-blue-900 shadow-xl shadow-blue-100'}`}>
                 <div className="flex justify-between items-center text-[10px] opacity-70 font-black uppercase tracking-widest">
                   <span>Giá thuê ({billing.days} ngày)</span>
                   <span className="font-bold">{formatCurrency(billing.rentalFee)}</span>
                 </div>
-                
                 {isDelivery && (
                   <div className="flex justify-between items-center text-[10px] opacity-70 font-black uppercase tracking-widest">
                     <span>Phí giao xe</span>
                     <span className="font-bold">{formatCurrency(billing.deliveryFee)}</span>
                   </div>
                 )}
-
                 <div className="flex justify-between items-center text-[10px] opacity-70 font-black uppercase tracking-widest">
                   <span>Phí bảo hiểm chuyến đi</span>
                   <span className="font-bold">{formatCurrency(120000)}</span>
                 </div>
+                {billing.discount > 0 && (
+                  <div className="flex justify-between items-center text-[10px] text-green-300 font-black uppercase tracking-widest animate-in fade-in">
+                    <span>Mã giảm giá</span>
+                    <span className="font-bold">-{formatCurrency(billing.discount)}</span>
+                  </div>
+                )}
                 <div className="border-t border-white/20 pt-4 flex justify-between items-center">
                     <span className="font-black uppercase italic text-xs tracking-tighter">Tổng cộng</span>
                     <span className="text-2xl font-black italic">
@@ -314,28 +366,19 @@ export default function CarDetailPage() {
                 </div>
               </div>
 
-              {/* 🚀 ĐIỂM SỬA CHỮ HIỂN THỊ */}
               {isOverlapped && (
                 <div className="flex items-center gap-2 text-red-600 font-black text-[10px] uppercase italic mb-6 animate-pulse px-2">
                   <AlertCircle size={14} /> Trùng lịch! Xe đã có người đặt hoặc chủ xe bận.
                 </div>
               )}
 
-              {/* CHECKBOX ĐỒNG Ý ĐIỀU KHOẢN */}
               <div className="flex items-start gap-3 mb-6 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                <input
-                  type="checkbox"
-                  id="terms-agree"
-                  checked={isAgreed}
-                  onChange={(e) => setIsAgreed(e.target.checked)}
-                  className="mt-0.5 w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
-                />
+                <input type="checkbox" id="terms-agree" checked={isAgreed} onChange={(e) => setIsAgreed(e.target.checked)} className="mt-0.5 w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0" />
                 <label htmlFor="terms-agree" className="text-[11px] text-gray-600 cursor-pointer select-none leading-relaxed font-medium">
                   Tôi đã đọc và đồng ý với các <Link href="/policies/terms" target="_blank" className="font-bold text-blue-600 hover:underline">Điều kiện giao dịch</Link>, <Link href="/policies/delivery" target="_blank" className="font-bold text-blue-600 hover:underline">Quy chế giao nhận</Link> và bản mẫu <Link href="/policies/contract" target="_blank" className="font-bold text-blue-600 hover:underline uppercase">Hợp đồng thuê xe</Link> của nền tảng ViVuCar.
                 </label>
               </div>
 
-              {/* NÚT THANH TOÁN */}
               <button 
                 onClick={handleRentNow}
                 disabled={isOverlapped || billing.total === 0 || !isAgreed}

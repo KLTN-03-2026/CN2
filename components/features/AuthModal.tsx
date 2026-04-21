@@ -2,7 +2,7 @@
 // @ts-nocheck
 "use client";
 import { useState, useEffect } from "react";
-import { X, Phone, Lock, User, Loader2, Mail, ArrowLeft } from "lucide-react";
+import { X, Phone, Lock, User, Loader2, Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
 import CarAnimation from "../ui/CarAnimation"; 
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react"; 
@@ -20,6 +20,9 @@ export default function AuthModal({ onClose, onSuccess, initialMode = "login" })
   const [isLoading, setIsLoading] = useState(false);
   const [showAnimation, setShowAnimation] = useState(false);
   
+  // 🚀 Thêm state quản lý giao diện báo thành công khi Quên mật khẩu
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+  
   const [formData, setFormData] = useState({ 
     name: "", email: "", phone: "", password: "", confirmPass: "" 
   });
@@ -32,6 +35,7 @@ export default function AuthModal({ onClose, onSuccess, initialMode = "login" })
 
   useEffect(() => {
     setErrors({});
+    setForgotSuccess(false); // Dọn dẹp trạng thái thành công khi đổi tab
   }, [viewMode]);
 
   const validateField = (name, value) => {
@@ -97,8 +101,8 @@ export default function AuthModal({ onClose, onSuccess, initialMode = "login" })
           body: JSON.stringify({ phone: formData.phone })
         });
         if (res.ok) {
-          alert("Hệ thống đã gửi yêu cầu khôi phục!");
-          setViewMode("login");
+          // 🚀 Thay vì dùng alert(), bật giao diện thành công đẹp mắt
+          setForgotSuccess(true); 
         } else {
           const data = await res.json();
           setErrors(prev => ({ ...prev, phone: data.error }));
@@ -118,7 +122,6 @@ export default function AuthModal({ onClose, onSuccess, initialMode = "login" })
         const data = await res.json();
 
         if (res.ok) {
-            // Đăng ký xong -> Tự động đăng nhập qua NextAuth
             const loginRes = await signIn("credentials", {
                 phone: formData.phone,
                 password: formData.password,
@@ -126,8 +129,8 @@ export default function AuthModal({ onClose, onSuccess, initialMode = "login" })
             });
 
             if (!loginRes?.error) {
-                localStorage.removeItem("user"); // 🚀 Dọn dẹp rác cũ
-                setShowAnimation(true); // Hiện hiệu ứng xe chạy thành công
+                localStorage.removeItem("user"); 
+                setShowAnimation(true); 
             } else {
                 setViewMode("login");
             }
@@ -156,7 +159,7 @@ export default function AuthModal({ onClose, onSuccess, initialMode = "login" })
           setErrors({ phone: "SĐT hoặc mật khẩu không đúng!", password: " " });
           setIsLoading(false);
         } else {
-          localStorage.removeItem("user"); // 🚀 Dọn dẹp rác cũ
+          localStorage.removeItem("user"); 
           
           const callback = searchParams.get("callback");
           if (callback) {
@@ -174,7 +177,6 @@ export default function AuthModal({ onClose, onSuccess, initialMode = "login" })
 
   const handleAnimationDone = () => {
     setShowAnimation(false);
-    // Sau khi đăng ký thành công, load lại trang để nhận diện session mới
     const callback = searchParams.get("callback");
     if (callback) {
       window.location.href = decodeURIComponent(callback);
@@ -185,8 +187,9 @@ export default function AuthModal({ onClose, onSuccess, initialMode = "login" })
 
   if (showAnimation) return <CarAnimation onComplete={handleAnimationDone} />;
 
-  const renderInput = (name, icon, type, placeholder) => (
-    <div className="mb-4">
+  // 🚀 Đã thêm tham số `hint` để hiển thị nhắc nhở nhẹ nhàng bên dưới input
+  const renderInput = (name, icon, type, placeholder, hint = null) => (
+    <div className="mb-4 relative">
       <div className={`flex items-center border-2 rounded-2xl p-4 bg-gray-50 transition-all ${
         errors[name] ? "border-red-400 bg-red-50/50 text-red-600" : "border-gray-100 focus-within:border-blue-500"
       }`}>
@@ -197,16 +200,26 @@ export default function AuthModal({ onClose, onSuccess, initialMode = "login" })
           value={formData[name]} onChange={handleChange} onBlur={handleBlur} 
         />
       </div>
-      {errors[name] && errors[name] !== " " && <p className="text-red-500 text-[10px] font-bold italic mt-1.5 ml-2 animate-in slide-in-from-top-1">* {errors[name]}</p>}
+      
+      {/* Hiển thị lỗi màu đỏ (nếu có) */}
+      {errors[name] && errors[name] !== " " && (
+        <p className="text-red-500 text-[10px] font-bold italic mt-1.5 ml-2 animate-in slide-in-from-top-1">* {errors[name]}</p>
+      )}
+      
+      {/* 🚀 Hiển thị lời nhắc màu xanh (nếu không có lỗi và có truyền hint) */}
+      {!errors[name] && hint && (
+        <p className="text-blue-500 text-[10px] font-bold italic mt-1.5 ml-2">* {hint}</p>
+      )}
     </div>
   );
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 font-sans">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
       <div className="relative bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl animate-in fade-in zoom-in duration-300 overflow-y-auto max-h-[90vh]">
         <button onClick={onClose} className="absolute top-5 right-5 text-gray-400 hover:text-red-500 transition-colors p-2"><X size={24} /></button>
         
+        {/* HEADER */}
         <div className="text-center mb-8">
             <h2 className="text-3xl font-black text-blue-900 italic uppercase tracking-tighter leading-none">
                 {viewMode === "forgot" ? "Khôi Phục Mật Khẩu" : viewMode === "login" ? "Đăng Nhập" : "Tạo Tài Khoản"}
@@ -214,32 +227,61 @@ export default function AuthModal({ onClose, onSuccess, initialMode = "login" })
             <p className="text-gray-400 text-xs mt-2 font-bold uppercase tracking-widest">ViVuCar - Nâng tầm hành trình</p>
         </div>
 
-        <div>
-            {viewMode === "register" && renderInput("name", <User size={20}/>, "text", "Họ và tên của bạn")}
-            {viewMode === "register" && renderInput("email", <Mail size={20}/>, "email", "Địa chỉ Email")}
-            {renderInput("phone", <Phone size={20}/>, "tel", "Số điện thoại")}
-            {viewMode !== "forgot" && renderInput("password", <Lock size={20}/>, "password", "Mật khẩu")}
-            {viewMode === "register" && renderInput("confirmPass", <Lock size={20}/>, "password", "Xác nhận mật khẩu")}
-
-            {viewMode === "login" && (
-              <div className="flex justify-end mb-4 -mt-2">
-                <button onClick={() => setViewMode("forgot")} className="text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors italic">Quên mật khẩu?</button>
-              </div>
-            )}
-
-            <button onClick={handleSubmit} disabled={isLoading} className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl hover:bg-blue-700 transition-all flex justify-center shadow-xl shadow-blue-100 active:scale-95 disabled:bg-gray-400 uppercase italic tracking-tighter mt-2">
-                {isLoading ? <Loader2 className="animate-spin"/> : viewMode === "login" ? "ĐĂNG NHẬP NGAY" : viewMode === "register" ? "TẠO TÀI KHOẢN" : "TÌM TÀI KHOẢN"}
-            </button>
-
-            <div className="text-center pt-4 border-t border-gray-100 mt-6">
-                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-                    {viewMode === "login" ? "Chưa có tài khoản?" : "Đã có tài khoản?"} 
-                    <span className="text-blue-600 font-black ml-2 cursor-pointer hover:underline italic" onClick={() => setViewMode(viewMode === "login" ? "register" : "login")}>
-                        {viewMode === "login" ? "Đăng ký ngay" : "Đăng nhập tại đây"}
-                    </span>
-                </p>
+        {/* 🚀 GIAO DIỆN BÁO THÀNH CÔNG KHI QUÊN MẬT KHẨU */}
+        {viewMode === "forgot" && forgotSuccess ? (
+          <div className="text-center animate-in fade-in zoom-in duration-300 pb-4">
+            <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner border border-green-100">
+              <Mail size={40} />
             </div>
-        </div>
+            <h3 className="text-xl font-black text-green-600 uppercase italic mb-3 tracking-tighter">Yêu cầu đã được gửi!</h3>
+            <p className="text-sm font-medium text-gray-600 leading-relaxed mb-8 px-2">
+              Chúng tôi đã gửi đường dẫn khôi phục mật khẩu. Vui lòng kiểm tra <strong>Email</strong> liên kết với số điện thoại này <span className="italic text-gray-400">(bao gồm cả thư mục Spam/Thư rác)</span>.
+            </p>
+            <button 
+              onClick={() => { setViewMode("login"); setForgotSuccess(false); }} 
+              className="w-full bg-gray-100 text-gray-600 font-black py-4 rounded-2xl hover:bg-gray-200 transition-all uppercase italic tracking-tighter"
+            >
+              QUAY LẠI ĐĂNG NHẬP
+            </button>
+          </div>
+        ) : (
+          /* GIAO DIỆN FORM NHẬP LIỆU BÌNH THƯỜNG */
+          <div>
+              {viewMode === "register" && renderInput("name", <User size={20}/>, "text", "Họ và tên của bạn")}
+              
+              {/* 🚀 Thêm câu nhắc nhở ở đây */}
+              {viewMode === "register" && renderInput("email", <Mail size={20}/>, "email", "Địa chỉ Email", "Vui lòng nhập đúng Email thực để khôi phục mật khẩu sau này")}
+              
+              {renderInput("phone", <Phone size={20}/>, "tel", "Số điện thoại")}
+              {viewMode !== "forgot" && renderInput("password", <Lock size={20}/>, "password", "Mật khẩu")}
+              {viewMode === "register" && renderInput("confirmPass", <Lock size={20}/>, "password", "Xác nhận mật khẩu")}
+
+              {viewMode === "login" && (
+                <div className="flex justify-end mb-4 -mt-2">
+                  <button onClick={() => setViewMode("forgot")} className="text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors italic">Quên mật khẩu?</button>
+                </div>
+              )}
+
+              {viewMode === "forgot" && (
+                 <p className="text-xs font-medium text-gray-500 mb-6 text-center italic">
+                   Vui lòng nhập số điện thoại bạn đã đăng ký. Hệ thống sẽ tự động tra cứu Email liên kết và gửi link khôi phục cho bạn.
+                 </p>
+              )}
+
+              <button onClick={handleSubmit} disabled={isLoading} className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl hover:bg-blue-700 transition-all flex justify-center shadow-xl shadow-blue-100 active:scale-95 disabled:bg-gray-400 uppercase italic tracking-tighter mt-2">
+                  {isLoading ? <Loader2 className="animate-spin"/> : viewMode === "login" ? "ĐĂNG NHẬP NGAY" : viewMode === "register" ? "TẠO TÀI KHOẢN" : "GỬI YÊU CẦU"}
+              </button>
+
+              <div className="text-center pt-4 border-t border-gray-100 mt-6">
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
+                      {viewMode === "login" ? "Chưa có tài khoản?" : viewMode === "register" ? "Đã có tài khoản?" : "Nhớ ra mật khẩu rồi?"} 
+                      <span className="text-blue-600 font-black ml-2 cursor-pointer hover:underline italic" onClick={() => setViewMode(viewMode === "login" ? "register" : "login")}>
+                          {viewMode === "login" ? "Đăng ký ngay" : "Đăng nhập tại đây"}
+                      </span>
+                  </p>
+              </div>
+          </div>
+        )}
       </div>
     </div>
   );

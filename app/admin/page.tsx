@@ -8,9 +8,9 @@ import { useSession } from "next-auth/react";
 import { 
   CheckCircle, XCircle, TrendingUp, Package, 
   ChevronRight, Calendar, Banknote, CheckSquare,
-  ShieldCheck, Loader2, Car, MapPin, Phone
+  ShieldCheck, Loader2, Car, MapPin, Phone,
+  Truck, MessageSquare // 🚀 Bổ sung icon Truck và MessageSquare
 } from "lucide-react";
-// IMPORT BỘ NÃO TRUNG TÂM VÀO ĐÂY
 import { getBookingState } from "@/lib/bookingUtils"; 
 
 const formatCurrency = (amount) => {
@@ -49,7 +49,6 @@ export default function AdminPage() {
     }
   };
 
-  // 🚀 HÀM NÂNG CẤP: ĐẨY TRẠNG THÁI ĐƠN ĐA NĂNG
   const handleUpdateStatus = async (id, newStatus) => {
     let actionText = '';
     if (newStatus === 'CANCELLED') actionText = 'HỦY BỎ';
@@ -76,7 +75,6 @@ export default function AdminPage() {
     }
   };
 
-  // 🚀 HÀM XỬ LÝ CHỐT CHUYẾN VÀ TRẢ TIỀN CHO ĐỐI TÁC
   const handleCompleteBooking = async (id) => {
     if (!confirm("XÁC NHẬN: Khách đã trả xe và bạn muốn chốt tiền chuyến này?")) return;
 
@@ -88,7 +86,7 @@ export default function AdminPage() {
       
       if (res.ok && data.success) {
         alert("✅ Đã chốt đơn thành công!");
-        fetchBookings(); // Tải lại danh sách đơn để cập nhật trạng thái
+        fetchBookings(); 
       } else {
         alert(`❌ LỖI: ${data.error || "Không thể chốt đơn"}`);
       }
@@ -97,18 +95,16 @@ export default function AdminPage() {
     }
   };
 
-  // BỘ LỌC TỐI ƯU
   const filterTabs = [
     { key: "ALL", label: "Tất cả" },
     { key: "PENDING", label: "Chờ cọc" },
-    { key: "CONFIRMED", label: "Chờ giao xe" },
+    { key: "CONFIRMED", label: "Chờ giao" },
     { key: "IN_PROGRESS", label: "Đang thuê" },
     { key: "RETURNED", label: "Chờ chốt" },
     { key: "COMPLETED", label: "Đã xong" },
     { key: "CANCELLED", label: "Đã hủy" },
   ];
 
-  // THỐNG KÊ TỐI ƯU
   const stats = {
     total: bookings.length,
     active: bookings.filter(b => b.status === "IN_PROGRESS").length,
@@ -131,7 +127,6 @@ export default function AdminPage() {
     <div className="min-h-screen bg-[#f8fafc] pb-20 pt-10 font-sans">
       <div className="container mx-auto px-4 max-w-7xl">
         
-        {/* HEADER & TỔNG QUAN */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
           <div>
             <h1 className="text-4xl font-black text-blue-900 uppercase italic tracking-tighter flex items-center gap-3">
@@ -140,7 +135,6 @@ export default function AdminPage() {
             <p className="text-[10px] text-gray-400 font-bold uppercase mt-2 ml-12 tracking-[0.2em]">Hệ thống điều hành ViVuCar</p>
           </div>
           
-          {/* TAB BỘ LỌC MỚI */}
           <div className="flex flex-wrap gap-1 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 w-full md:w-auto">
             {filterTabs.map((tab) => (
               <button 
@@ -158,7 +152,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* THỐNG KÊ NHANH */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all">
             <div>
@@ -185,7 +178,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* BẢNG DỮ LIỆU CHÍNH */}
         <div className="bg-white rounded-[40px] shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -193,7 +185,7 @@ export default function AdminPage() {
                 <tr className="bg-gray-50/50 text-gray-400 text-[10px] font-black uppercase tracking-[0.2em]">
                   <th className="p-6 border-b border-gray-100">Mã đơn</th>
                   <th className="p-6 border-b border-gray-100">Khách hàng</th>
-                  <th className="p-6 border-b border-gray-100">Phương tiện</th>
+                  <th className="p-6 border-b border-gray-100">Phương tiện & Giao nhận</th>
                   <th className="p-6 border-b border-gray-100">Lịch trình</th>
                   <th className="p-6 border-b border-gray-100">Thanh toán</th>
                   <th className="p-6 border-b border-gray-100 text-center">Trạng thái & Thao tác</th>
@@ -209,26 +201,45 @@ export default function AdminPage() {
                       <p className="text-[8px] font-bold text-gray-400 uppercase mt-1 tracking-widest">{new Date(booking.createdAt).toLocaleDateString('vi-VN')}</p>
                     </td>
                     
-                    {/* CỘT KHÁCH HÀNG */}
                     <td className="p-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-black italic text-xs">
-                          {(booking.user?.name || "U").charAt(0).toUpperCase()}
+                        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-black italic text-xs shrink-0">
+                          {(booking.customerName || booking.user?.name || "U").charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-black text-blue-900 uppercase text-xs italic tracking-tighter">
-                            {booking.user?.name || "Khách ẩn danh"}
+                          <p className="font-black text-blue-900 uppercase text-xs italic tracking-tighter line-clamp-1">
+                            {booking.customerName || booking.user?.name || "Khách ẩn danh"}
                           </p>
-                          <p className="text-[10px] text-gray-400 font-bold flex items-center gap-1 mt-0.5">
-                            <Phone size={10}/> {booking.user?.phone || "Chưa có SĐT"}
+                          <p className="text-[10px] text-gray-500 font-bold flex items-center gap-1 mt-0.5">
+                            <Phone size={10} className="text-gray-400"/> {booking.customerPhone || booking.user?.phone || "Chưa có SĐT"}
                           </p>
                         </div>
                       </div>
                     </td>
 
-                    <td className="p-6">
-                      <p className="font-black text-blue-600 uppercase italic text-xs tracking-tighter">{booking.car?.name}</p>
-                      <p className="text-[9px] text-gray-400 font-bold uppercase flex items-center gap-1 mt-1"><MapPin size={10}/> {booking.car?.location}</p>
+                    {/* 🚀 ĐIỂM CẬP NHẬT: GỘP THÔNG TIN XE + GIAO NHẬN + GHI CHÚ VÀO 1 CỘT */}
+                    <td className="p-6 min-w-[220px]">
+                      <p className="font-black text-blue-600 uppercase italic text-xs tracking-tighter mb-2 line-clamp-1">{booking.car?.name}</p>
+                      
+                      {booking.isDelivery ? (
+                        <div className="bg-orange-50 p-2 rounded-xl border border-orange-100 mb-2">
+                          <p className="text-[9px] font-black text-orange-600 uppercase flex items-center gap-1 mb-1"><Truck size={10}/> Giao tận nơi</p>
+                          <p className="text-[10px] text-gray-700 font-medium leading-tight line-clamp-2" title={booking.deliveryAddress}>
+                            {booking.deliveryAddress}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 p-2 rounded-xl border border-gray-100 mb-2">
+                          <p className="text-[9px] font-black text-gray-500 uppercase flex items-center gap-1"><MapPin size={10}/> Khách tự đến lấy xe</p>
+                        </div>
+                      )}
+
+                      {booking.note && (
+                        <div className="flex items-start gap-1.5 bg-blue-50/50 p-2 rounded-xl border border-blue-50">
+                          <MessageSquare size={10} className="mt-0.5 text-blue-400 shrink-0"/>
+                          <p className="text-[10px] text-gray-600 italic line-clamp-2" title={booking.note}>"{booking.note}"</p>
+                        </div>
+                      )}
                     </td>
                     
                     <td className="p-6">
@@ -250,8 +261,21 @@ export default function AdminPage() {
                       </div>
                     </td>
                     
+                    {/* 🚀 ĐÃ SỬA LỖI: Ưu tiên kiểm tra booking.status === 'PENDING' trước */}
                     <td className="p-6">
-                      {booking.paymentStatus === "PAID_FULL" ? (
+                      {booking.status === "PENDING" ? (
+                        <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 w-fit">
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                            Chưa thanh toán
+                          </p>
+                          <p className="font-black text-gray-400 text-sm italic tracking-tighter opacity-80">
+                            Tổng: {formatCurrency(booking.totalPrice)}
+                          </p>
+                          <p className="text-[9px] font-bold text-orange-500 uppercase mt-1 tracking-widest">
+                            Chờ cọc: {formatCurrency(booking.depositAmount)}
+                          </p>
+                        </div>
+                      ) : booking.paymentMethod === "FULL_PAY" ? (
                         <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 w-fit">
                           <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 flex items-center gap-1">
                             <Banknote size={12}/> Đã trả 100%
@@ -260,7 +284,7 @@ export default function AdminPage() {
                             {formatCurrency(booking.totalPrice)}
                           </p>
                         </div>
-                      ) : booking.paymentStatus === "DEPOSITED" ? (
+                      ) : (
                         <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 w-fit shadow-sm">
                           <div className="mb-2">
                             <p className="text-[9px] font-black text-orange-600 uppercase tracking-widest mb-1">Đã đặt cọc</p>
@@ -276,15 +300,6 @@ export default function AdminPage() {
                             </p>
                           </div>
                         </div>
-                      ) : (
-                        <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 w-fit">
-                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">
-                            Chưa thanh toán
-                          </p>
-                          <p className="font-black text-gray-500 text-sm italic tracking-tighter opacity-80">
-                            {formatCurrency(booking.totalPrice)}
-                          </p>
-                        </div>
                       )}
                     </td>
 
@@ -297,7 +312,6 @@ export default function AdminPage() {
                               {state.text}
                             </span>
                             
-                            {/* Nút Hủy cho đơn PENDING */}
                             {state.canAdminAction && booking.status === 'PENDING' && (
                               <div className="flex gap-2 w-full mt-2 justify-center">
                                 <button onClick={() => handleUpdateStatus(booking.id, 'CANCELLED')} className="w-full bg-red-50 text-red-500 p-2 rounded-xl hover:bg-red-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1 text-[9px] font-black uppercase tracking-widest" title="Hủy đơn">
@@ -306,7 +320,6 @@ export default function AdminPage() {
                               </div>
                             )}
 
-                            {/* 🚀 NÚT GIAO XE (CHỈ DÀNH CHO XE HỆ THỐNG - COMPANY) */}
                             {booking.car?.ownerType === "COMPANY" && booking.status === 'CONFIRMED' && (
                               <button 
                                 onClick={() => handleUpdateStatus(booking.id, 'IN_PROGRESS')}
@@ -316,7 +329,6 @@ export default function AdminPage() {
                               </button>
                             )}
 
-                            {/* 🚀 NÚT THU HỒI XE (CHỈ DÀNH CHO XE HỆ THỐNG - COMPANY) */}
                             {booking.car?.ownerType === "COMPANY" && booking.status === 'IN_PROGRESS' && (
                               <button 
                                 onClick={() => handleUpdateStatus(booking.id, 'RETURNED')}
@@ -326,7 +338,6 @@ export default function AdminPage() {
                               </button>
                             )}
 
-                            {/* 🚀 NÚT CẬP NHẬT CHỐT TIỀN: CHỈ HIỆN KHI XE ĐÃ TRẢ VỀ (RETURNED) */}
                             {booking.status === 'RETURNED' && (
                               <button 
                                 onClick={() => handleCompleteBooking(booking.id)}
@@ -336,7 +347,6 @@ export default function AdminPage() {
                               </button>
                             )}
 
-                            {/* HIỂN THỊ KHI ĐÃ HOÀN TẤT */}
                             {booking.status === 'COMPLETED' && (
                               <div className="mt-2 w-full flex items-center justify-center gap-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 py-2 px-3 rounded-xl font-black text-[9px] uppercase tracking-widest">
                                 <ShieldCheck size={14} /> Giao dịch hoàn tất

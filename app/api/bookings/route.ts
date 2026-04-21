@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     // 🚀 BƯỚC QUAN TRỌNG: Lấy session trực tiếp từ Server
     const session = await getServerSession(authOptions);
 
-    // 1. KIỂM TRA ĐĂNG NHẬP (Lấy ID từ session, không lấy từ Body nữa)
+    // 1. KIỂM TRA ĐĂNG NHẬP (Lấy ID từ session)
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json(
         { error: "BẠN CẦN ĐĂNG NHẬP ĐỂ THỰC HIỆN ĐẶT XE!" }, 
@@ -18,6 +18,39 @@ export async function POST(request: Request) {
       );
     }
 
+    const userId = session.user.id; // 🚀 ID "xịn" lấy từ NextAuth
+    // 🚀 BƯỚC MỚI: QUÉT RÁC TỰ ĐỘNG (AUTO-CLEANUP)
+    // Tìm tất cả các đơn PENDING của TOÀN HỆ THỐNG đã quá 20 phút và tự động HỦY chúng.
+    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
+    await prisma.booking.updateMany({
+      where: {
+        status: "PENDING",
+        createdAt: { lt: twentyMinutesAgo } // lt = less than (Nhỏ hơn/Cũ hơn 20 phút trước)
+      },
+      data: {
+        status: "CANCELLED",
+        note: "Hệ thống tự động hủy do quá hạn thanh toán 20 phút." // Ghi chú lại để Admin biết
+      }
+    });
+
+    // 🚀 BƯỚC 1.5: CHỐNG ĐẦU CƠ/PHÁ HOẠI (INVENTORY HOARDING)
+    // Quét xem tài khoản này có đơn nào đang "Treo" chưa thanh toán không
+    const pendingBooking = await prisma.booking.findFirst({
+      where: {
+        userId: Number(userId),
+        status: "PENDING"
+      }
+    });
+
+    // Nếu phát hiện có đơn đang treo, "đá" văng ra ngoài ngay lập tức!
+    if (pendingBooking) {
+      return NextResponse.json(
+        { error: "BẠN ĐANG CÓ MỘT ĐƠN ĐẶT XE CHƯA HOÀN TẤT THANH TOÁN. VUI LÒNG THANH TOÁN HOẶC HỦY ĐƠN CŨ ĐỂ TIẾP TỤC!" },
+        { status: 400 }
+      );
+    }
+
+    // Nếu qua được ải kiểm tra trên, hệ thống mới tiếp tục xử lý body...
     const body = await request.json();
     const { 
       carId, 
@@ -33,8 +66,6 @@ export async function POST(request: Request) {
       deliveryFee,
       paymentMethod 
     } = body;
-
-    const userId = session.user.id; // 🚀 ID "xịn" lấy từ NextAuth
 
     // 2. KIỂM TRA THÔNG TIN XE VÀ THỜI GIAN
     if (!carId || !startDate || !endDate) {

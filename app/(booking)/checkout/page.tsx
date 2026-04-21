@@ -4,11 +4,10 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react"; // 🚀 ĐIỂM MỚI: Dùng NextAuth
+import { useSession } from "next-auth/react"; 
 import { 
-  User, Phone, ChevronLeft, Calendar, 
-  ShieldCheck, CreditCard, MessageSquare, MapPin, Mail, 
-  Tag, Gift, Loader2, X, Clock, ArrowRight
+  User, ChevronLeft, Calendar, 
+  CreditCard, MapPin, Loader2, ArrowRight, Truck 
 } from "lucide-react";
 
 const formatCurrency = (amount) => {
@@ -20,39 +19,40 @@ export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  // 🚀 LẤY SESSION TỪ NEXTAUTH
   const { data: session, status } = useSession();
   
   const [car, setCar] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
   
-  // LOGIC ƯU ĐÃI
-  const [promoCode, setPromoCode] = useState("");
+  // 🚀 Chỉ cần lưu thông tin mã đã apply từ URL
   const [appliedPromo, setAppliedPromo] = useState(null);
-  const [isValidating, setIsValidating] = useState(false);
 
-  const [formData, setFormData] = useState({ 
-    name: "", phone: "", email: "", note: "" 
-  });
-
+  // Lấy các tham số từ URL
   const carId = searchParams.get("carId");
   const startDate = searchParams.get("start");
   const endDate = searchParams.get("end");
+  const isDeliveryFromUrl = searchParams.get("isDelivery") === "true";
+  const promoFromUrl = searchParams.get("promo");
+
+  const [formData, setFormData] = useState({ 
+    name: "", 
+    phone: "", 
+    email: "", 
+    note: "",
+    deliveryAddress: ""
+  });
 
   useEffect(() => {
     setMounted(true);
 
-    // 🚀 KIỂM TRA ĐĂNG NHẬP QUA NEXTAUTH
     if (status === "unauthenticated") {
       alert("Vui lòng đăng nhập để thực hiện đặt chuyến!");
-      // Chuyển về trang chủ để hiện Modal Login và quay lại đây sau khi xong
       const currentQuery = searchParams.toString();
       router.push(`/?auth=login&callback=/checkout?${currentQuery}`);
       return;
     }
 
-    // TỰ ĐỘNG ĐIỀN THÔNG TIN TỪ SESSION VÀO FORM
     if (status === "authenticated" && session?.user) {
       setFormData(f => ({ 
         ...f, 
@@ -62,7 +62,6 @@ export default function CheckoutPage() {
       }));
     }
 
-    // FETCH DỮ LIỆU XE
     if (carId) {
       fetch(`/api/cars/${carId}`)
         .then(res => res.ok ? res.json() : Promise.reject())
@@ -71,31 +70,30 @@ export default function CheckoutPage() {
     }
   }, [carId, router, status, session, searchParams]);
 
-  const handleApplyPromo = async () => {
-    if (!promoCode.trim()) return;
-    setIsValidating(true);
-    try {
-      const res = await fetch("/api/promotions/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: promoCode.trim() })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setAppliedPromo(data);
-      } else {
-        alert(data.error || "Mã không hợp lệ");
-        setAppliedPromo(null);
-      }
-    } catch (e) {
-      alert("Lỗi kết nối máy chủ");
-    } finally {
-      setIsValidating(false);
+  // 🚀 Tự động Validate lại mã giảm giá nếu có trên URL để lấy mức giảm chính xác
+  useEffect(() => {
+    if (promoFromUrl) {
+      const validatePromo = async () => {
+        try {
+          const res = await fetch("/api/promotions/validate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code: promoFromUrl })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setAppliedPromo(data);
+          }
+        } catch (error) {
+          console.error("Lỗi xác thực mã giảm giá:", error);
+        }
+      };
+      validatePromo();
     }
-  };
+  }, [promoFromUrl]);
 
   const billing = useMemo(() => {
-    if (!car || !startDate || !endDate) return { days: 0, rentalFee: 0, serviceFee: 120000, discount: 0, total: 0 };
+    if (!car || !startDate || !endDate) return { days: 0, rentalFee: 0, serviceFee: 120000, deliveryFee: 0, discount: 0, total: 0 };
     
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -105,6 +103,8 @@ export default function CheckoutPage() {
     const pricePerDay = car.priceDiscount || car.priceOriginal;
     const rentalFee = pricePerDay * finalDays;
     const serviceFee = 120000;
+    
+    const deliveryFee = isDeliveryFromUrl ? (Number(car.deliveryFee) || 0) : 0; 
 
     let discountAmount = 0;
     if (appliedPromo) {
@@ -115,19 +115,22 @@ export default function CheckoutPage() {
       }
     }
 
-    const total = rentalFee + serviceFee - discountAmount;
-    return { days: finalDays, rentalFee, serviceFee, discount: discountAmount, total: total < 0 ? 0 : total };
-  }, [car, startDate, endDate, appliedPromo]);
+    const total = rentalFee + serviceFee + deliveryFee - discountAmount;
+    return { days: finalDays, rentalFee, serviceFee, deliveryFee, discount: discountAmount, total: total < 0 ? 0 : total };
+  }, [car, startDate, endDate, appliedPromo, isDeliveryFromUrl]);
 
   const handleConfirm = async () => {
-    // 🚀 LẤY ID TỪ SESSION NEXTAUTH ĐỂ GỬI LÊN SERVER
     if (!session?.user?.id) return alert("Phiên đăng nhập hết hạn, vui lòng đăng nhập lại!");
     if (!formData.name || !formData.phone) return alert("Vui lòng nhập tên và số điện thoại!");
+    
+    if (isDeliveryFromUrl && !formData.deliveryAddress.trim()) {
+      return alert("Vui lòng nhập địa chỉ giao xe chi tiết!");
+    }
 
     setIsSubmitting(true);
     try {
       const payload = {
-        userId: session.user.id, // 🚀 Dùng ID từ session xịn
+        userId: session.user.id, 
         carId: Number(carId),
         startDate,
         endDate,
@@ -136,7 +139,10 @@ export default function CheckoutPage() {
         customerName: formData.name,
         customerPhone: formData.phone,
         customerNote: formData.note,
-        paymentMethod: "DEPOSIT" // Mặc định cọc
+        paymentMethod: "DEPOSIT",
+        isDelivery: isDeliveryFromUrl,
+        deliveryAddress: isDeliveryFromUrl ? formData.deliveryAddress : null,
+        deliveryFee: billing.deliveryFee
       };
 
       const res = await fetch("/api/bookings", {
@@ -158,7 +164,6 @@ export default function CheckoutPage() {
     }
   };
 
-  // Tránh lỗi Hydration
   if (!mounted || status === "loading") return (
     <div className="min-h-screen flex items-center justify-center font-black italic text-blue-600 animate-pulse uppercase">
       Đang chuẩn bị hồ sơ thanh toán...
@@ -176,10 +181,8 @@ export default function CheckoutPage() {
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          
           <div className="lg:col-span-2 space-y-6">
             
-            {/* PHẦN LỊCH TRÌNH THUÊ XE */}
             <section className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
               <div className="flex items-center gap-3 mb-8">
                 <div className="bg-blue-900 p-2 rounded-xl text-white"><Calendar size={20}/></div>
@@ -213,7 +216,43 @@ export default function CheckoutPage() {
               </div>
             </section>
 
-            {/* HỒ SƠ KHÁCH HÀNG */}
+            {/* XÁC NHẬN HÌNH THỨC GIAO XE */}
+            <section className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-blue-900 p-2 rounded-xl text-white"><Truck size={20}/></div>
+                <div>
+                    <h3 className="font-black text-blue-900 uppercase text-sm italic leading-none">Hình thức nhận xe</h3>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 tracking-widest">Thông tin giao nhận đã chọn</p>
+                </div>
+              </div>
+
+              {isDeliveryFromUrl ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-blue-50/50 border-2 border-blue-600 rounded-2xl flex items-center justify-between">
+                    <span className="font-black uppercase italic text-sm text-blue-900">Giao xe tận nơi</span>
+                    <span className="text-[10px] font-black text-orange-600 uppercase">Phí: {formatCurrency(billing.deliveryFee)}</span>
+                  </div>
+                  <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-top-4">
+                    <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1 italic flex items-center gap-1.5">
+                      <MapPin size={12}/> Địa chỉ giao xe chi tiết *
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="VD: Số 123 Đường ABC, Phường X, Quận Y..."
+                      value={formData.deliveryAddress} 
+                      className="w-full bg-gray-50 border-2 border-gray-50 rounded-2xl p-4 font-bold text-gray-700 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner" 
+                      onChange={e => setFormData({...formData, deliveryAddress: e.target.value})} 
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-blue-50/50 border-2 border-blue-600 rounded-2xl flex flex-col gap-2">
+                    <span className="font-black uppercase italic text-sm text-blue-900">Tự đến lấy xe tại bãi</span>
+                    <p className="text-sm font-medium text-gray-600">{car.address || "Đang cập nhật địa chỉ bãi xe"}</p>
+                </div>
+              )}
+            </section>
+
             <section className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
               <div className="flex items-center gap-3 mb-8">
                 <div className="bg-blue-900 p-2 rounded-xl text-white"><User size={20}/></div>
@@ -246,45 +285,11 @@ export default function CheckoutPage() {
                 <img src={car.image} className="w-full h-full object-cover" />
               </div>
               
-              <div className="mb-6">
+              <div className="mb-6 border-b border-gray-100 pb-6">
                 <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-3 py-1 rounded-lg uppercase italic">{car.brand}</span>
                 <h2 className="text-2xl font-black text-blue-900 mt-2 uppercase italic tracking-tighter leading-tight">{car.name}</h2>
               </div>
 
-              {/* Ô NHẬP MÃ ƯU ĐÃI */}
-              <div className="bg-gray-50 p-5 rounded-[24px] border border-dashed border-gray-200 mb-6">
-                <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block italic">Mã giảm giá</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="VÍ DỤ: BONBONNEW" 
-                    value={promoCode}
-                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                    className="flex-grow bg-white border border-gray-100 rounded-xl px-4 py-2 text-[10px] font-black uppercase italic outline-none focus:border-blue-600 transition-all"
-                  />
-                  <button 
-                    onClick={handleApplyPromo}
-                    disabled={isValidating || !promoCode}
-                    className="bg-blue-900 text-white px-4 rounded-xl font-black uppercase italic text-[9px] hover:bg-black transition-all active:scale-90 disabled:opacity-50"
-                  >
-                    {isValidating ? <Loader2 className="animate-spin" size={14}/> : "ÁP DỤNG"}
-                  </button>
-                </div>
-
-                {appliedPromo && (
-                  <div className="mt-3 flex justify-between items-center bg-green-50 p-2 rounded-xl border border-green-100 animate-in fade-in slide-in-from-top-1">
-                    <div className="flex items-center gap-2">
-                      <Gift size={14} className="text-green-600" />
-                      <span className="text-[9px] font-black text-green-700 uppercase italic tracking-tighter leading-none">
-                        -{appliedPromo.discount}{appliedPromo.type === "PERCENT" ? "%" : "đ"} (Đã áp dụng)
-                      </span>
-                    </div>
-                    <button onClick={() => {setAppliedPromo(null); setPromoCode("");}} className="text-red-400 hover:text-red-600"><X size={14}/></button>
-                  </div>
-                )}
-              </div>
-
-              {/* TÓM TẮT GIÁ TIỀN */}
               <div className="space-y-3 mb-8">
                 <div className="flex justify-between text-[10px] font-black text-gray-400 uppercase italic">
                   <span>Giá thuê ({billing.days} ngày)</span>
@@ -294,15 +299,24 @@ export default function CheckoutPage() {
                   <span>Phí dịch vụ</span>
                   <span className="text-gray-800">{formatCurrency(billing.serviceFee)}</span>
                 </div>
+                
+                {isDeliveryFromUrl && (
+                  <div className="flex justify-between text-[10px] font-black text-blue-600 uppercase italic animate-in fade-in">
+                    <span>Phí giao xe tận nơi</span>
+                    <span>{formatCurrency(billing.deliveryFee)}</span>
+                  </div>
+                )}
+
+                {/* 🚀 Chỗ này chỉ cần show mã giảm giá đã đọc từ URL, không cần ô input nữa */}
                 {billing.discount > 0 && (
                   <div className="flex justify-between text-[10px] font-black text-green-600 uppercase italic">
-                    <span>Ưu đãi giảm giá</span>
+                    <span>Mã giảm giá ({appliedPromo?.code})</span>
                     <span>-{formatCurrency(billing.discount)}</span>
                   </div>
                 )}
                 <div className="pt-4 border-t-2 border-blue-50 flex justify-between items-center">
                   <span className="text-blue-900 font-black uppercase italic text-xs tracking-widest">Tổng cộng</span>
-                  <span className="font-black text-3xl text-blue-600 italic tracking-tighter">{formatCurrency(billing.total)}</span>
+                  <span className="font-black text-3xl text-blue-600 italic tracking-tighter transition-all">{formatCurrency(billing.total)}</span>
                 </div>
               </div>
 
