@@ -9,7 +9,7 @@ import {
   CheckCircle, XCircle, TrendingUp, Package, 
   ChevronRight, Calendar, Banknote, CheckSquare,
   ShieldCheck, Loader2, Car, MapPin, Phone,
-  Truck, MessageSquare // 🚀 Bổ sung icon Truck và MessageSquare
+  Truck, MessageSquare 
 } from "lucide-react";
 import { getBookingState } from "@/lib/bookingUtils"; 
 
@@ -217,7 +217,6 @@ export default function AdminPage() {
                       </div>
                     </td>
 
-                    {/* 🚀 ĐIỂM CẬP NHẬT: GỘP THÔNG TIN XE + GIAO NHẬN + GHI CHÚ VÀO 1 CỘT */}
                     <td className="p-6 min-w-[220px]">
                       <p className="font-black text-blue-600 uppercase italic text-xs tracking-tighter mb-2 line-clamp-1">{booking.car?.name}</p>
                       
@@ -261,9 +260,35 @@ export default function AdminPage() {
                       </div>
                     </td>
                     
-                    {/* 🚀 ĐÃ SỬA LỖI: Ưu tiên kiểm tra booking.status === 'PENDING' trước */}
+                    {/* 🚀 LOGIC HIỂN THỊ THANH TOÁN ĐÃ ĐƯỢC CHỈNH SỬA TUYỆT ĐỐI CHÍNH XÁC */}
                     <td className="p-6">
-                      {booking.status === "PENDING" ? (
+                      {booking.status === "CANCELLED" ? (
+                        booking.paymentStatus === "PENDING" ? (
+                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 w-fit opacity-80">
+                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">
+                              Hủy trước khi cọc
+                            </p>
+                            <p className="font-black text-gray-400 text-sm italic tracking-tighter line-through">
+                              Tổng: {formatCurrency(booking.totalPrice)}
+                            </p>
+                            <p className="text-[9px] font-bold text-gray-500 uppercase mt-1 tracking-widest">
+                              Đã thu: 0đ
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="bg-red-50 p-3 rounded-xl border border-red-100 w-fit">
+                            <p className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-1">
+                              Đã hủy do quá hạn cọc
+                            </p>
+                            <p className="font-black text-red-400 text-sm italic tracking-tighter line-through opacity-80">
+                              Tổng: {formatCurrency(booking.totalPrice)}
+                            </p>
+                            <p className="text-[9px] font-bold text-red-600 uppercase mt-1 tracking-widest">
+                              Chưa cọc: {formatCurrency(booking.depositAmount)}
+                            </p>
+                          </div>
+                        )
+                      ) : booking.status === "PENDING" ? (
                         <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 w-fit">
                           <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">
                             Chưa thanh toán
@@ -271,7 +296,7 @@ export default function AdminPage() {
                           <p className="font-black text-gray-400 text-sm italic tracking-tighter opacity-80">
                             Tổng: {formatCurrency(booking.totalPrice)}
                           </p>
-                          <p className="text-[9px] font-bold text-orange-500 uppercase mt-1 tracking-widest">
+                          <p className="text-[9px] font-bold text-orange-500 uppercase mt-1 tracking-widest animate-pulse">
                             Chờ cọc: {formatCurrency(booking.depositAmount)}
                           </p>
                         </div>

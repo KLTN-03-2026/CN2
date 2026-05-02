@@ -6,7 +6,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth"; 
 
 // ==========================================
-// 1. HÀM GET: Lấy thông tin xe (Đã tích hợp Load Reviews)
+// 1. HÀM GET: Lấy thông tin xe (Đã vá lỗ hổng chặn lịch)
 // ==========================================
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,23 +14,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const id = resolvedParams.id;
     
     // Khởi tạo mốc thời gian: 20 phút trước 
-    const twentyMinutesAgo = new Date(Date.now() - 1 * 60 * 1000); // Đang để 1 phút để test
+    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000); 
 
     const car = await prisma.car.findUnique({
       where: { id: parseInt(id) },
       include: { 
+        // 🚀 ĐÃ VÁ LỖI TẠI ĐÂY: Kéo cả những đơn đang IN_PROGRESS xuống giao diện
         bookings: {
           where: { 
             OR: [
-              { status: "CONFIRMED" },
+              { status: { in: ["CONFIRMED", "IN_PROGRESS"] } },
               { status: "PENDING", createdAt: { gte: twentyMinutesAgo } }
             ]
           }
         },
-        // 🚀 Kéo danh sách lịch bận của chủ xe ra
+        // Kéo danh sách lịch bận của chủ xe ra
         blockedDates: true,
         
-        // 🚀 THÊM MỚI: Kéo toàn bộ đánh giá của xe này kèm tên User
+        // Kéo toàn bộ đánh giá của xe này kèm tên User
         reviews: {
           include: {
             user: {
@@ -38,7 +39,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             }
           },
           orderBy: {
-            createdAt: 'desc' // Đánh giá mới nhất nổi lên trên cùng
+            createdAt: 'desc' 
           }
         }
       },
@@ -46,14 +47,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     if (!car) return NextResponse.json({ error: "Không tìm thấy xe" }, { status: 404 });
 
-    // 🚀 BỨC TƯỜNG BẢO VỆ THÔNG MINH
+    // BỨC TƯỜNG BẢO VỆ THÔNG MINH
     if (car.status !== "APPROVED") {
       const session = await getServerSession(authOptions);
       
       const isAdmin = session?.user?.role === "ADMIN";
       const isOwner = session?.user?.id && car.userId === Number(session.user.id);
 
-      // Nếu không phải xe APPROVED, và người xem cũng KHÔNG phải Admin, KHÔNG phải Chủ xe -> Chặn!
       if (!isAdmin && !isOwner) {
         return NextResponse.json({ error: "Xe này hiện không khả dụng để thuê!" }, { status: 403 });
       }
@@ -108,6 +108,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 // ==========================================
 // 3. HÀM PUT: Cập nhật thông tin xe (Chỉ Admin hoặc Chủ xe)
 // ==========================================
+// ==========================================
+// 3. HÀM PUT: Cập nhật thông tin xe 
+// ==========================================
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
@@ -129,8 +132,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     const body = await request.json();
 
-    // 🚀 SỬA LỖI Ở ĐÂY: Phải loại bỏ cả "blockedDates" và "reviews" để Prisma không bị ngợp
-    const { id, createdAt, updatedAt, bookings, user, userId, blockedDates, reviews, ...restBody } = body;
+    // 🚀 ĐÃ SỬA TẠI ĐÂY: Chặn đứng wallet và walletId không cho chui vào Prisma
+    const { 
+      id, createdAt, updatedAt, bookings, user, userId, 
+      blockedDates, reviews, wallet, walletId, 
+      ...restBody 
+    } = body;
 
     const updateData = {
       ...restBody,
@@ -138,7 +145,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       priceDiscount: Number(restBody.priceDiscount) || 0,
       seats: Number(restBody.seats) || 5,
       deliveryFee: Number(restBody.deliveryFee) || 0,
-      // Xử lý thông minh: Dù Frontend gửi chuỗi hay mảng thì Backend vẫn parse chuẩn xác
       amenities: Array.isArray(restBody.amenities) 
         ? restBody.amenities 
         : (restBody.amenities ? restBody.amenities.split(',').map((item: string) => item.trim()).filter(Boolean) : []),

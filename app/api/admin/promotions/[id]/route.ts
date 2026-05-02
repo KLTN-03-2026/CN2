@@ -5,33 +5,51 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // 1. CẬP NHẬT THÔNG TIN MÃ
-export async function PATCH(request: Request, { params }) {
+export async function PATCH(request, { params }) {
   try {
-    const id = Number(params.id);
+    // 🚀 BƯỚC 1: BẮT BUỘC PHẢI AWAIT PARAMS Ở NEXT.JS 15
+    const resolvedParams = await params; 
+    const id = Number(resolvedParams.id);
+
+    // Bước 2: Lấy dữ liệu mới từ Frontend gửi lên
     const body = await request.json();
-    
-    const updated = await prisma.promotion.update({
-      where: { id },
+
+    // Bước 3: Cập nhật vào Database
+    const updatedPromo = await prisma.promotion.update({
+      where: { id: id },
       data: {
-        ...body,
-        discount: Number(body.discount),
-        startDate: new Date(body.startDate),
-        expiryDate: new Date(body.expiryDate),
-      }
+        title: body.title,
+        code: body.code,
+        discount: body.discount, // Chỉnh sửa giá tiền ở đây
+        type: body.type,
+        description: body.description,
+        isActive: body.isActive,
+        expiryDate: body.expiryDate,
+        // ... (cập nhật các trường dữ liệu mà bạn muốn sửa)
+      },
     });
-    return NextResponse.json(updated);
+
+    return NextResponse.json({ message: "Cập nhật thành công!", promo: updatedPromo });
   } catch (error) {
-    return NextResponse.json({ error: "Lỗi cập nhật" }, { status: 400 });
+    console.error("Lỗi cập nhật mã:", error);
+    return NextResponse.json({ error: "Lỗi hệ thống khi cập nhật" }, { status: 500 });
   }
 }
 
 // 2. XÓA MÃ ƯU ĐÃI
-export async function DELETE(request: Request, { params }) {
+export async function DELETE(request, { params }) {
   try {
-    const id = Number(params.id);
-    await prisma.promotion.delete({ where: { id } });
-    return NextResponse.json({ message: "Đã xóa thành công" });
+    
+    const resolvedParams = await params; 
+    const id = Number(resolvedParams.id);
+
+    await prisma.promotion.delete({
+      where: { id: id },
+    });
+
+    return NextResponse.json({ message: "Xóa thành công!" });
   } catch (error) {
-    return NextResponse.json({ error: "Lỗi khi xóa" }, { status: 400 });
+    console.error("Lỗi xóa mã:", error);
+    return NextResponse.json({ error: "Lỗi hệ thống khi xóa" }, { status: 500 });
   }
 }

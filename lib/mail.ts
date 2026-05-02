@@ -15,13 +15,13 @@ export const sendBookingEmail = async (to: string, userName: string, carName: st
   const color = status === "CONFIRMED" ? "#16a34a" : "#dc2626";
 
   const mailOptions = {
-    from: `"BonbonCar Support" <${process.env.EMAIL_USER}>`,
+    from: `"ViVuCar Support" <${process.env.EMAIL_USER}>`,
     to: to,
-    subject: `[BonbonCar] Thông báo trạng thái đơn đặt xe #${carName}`,
+    subject: `[ViVuCar] Thông báo trạng thái đơn đặt xe #${carName}`,
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
         <div style="background-color: #2563eb; padding: 20px; text-align: center;">
-          <h1 style="color: white; margin: 0;">BonbonCar</h1>
+          <h1 style="color: white; margin: 0;">ViVuCar</h1>
         </div>
         <div style="padding: 30px;">
           <p>Chào <strong>${userName}</strong>,</p>

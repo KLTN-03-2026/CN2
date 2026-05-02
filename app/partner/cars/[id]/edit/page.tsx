@@ -4,7 +4,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { CarFront, Save, ChevronLeft, FileText } from "lucide-react";
+import { CarFront, Save, ChevronLeft, FileText, ShieldCheck, UploadCloud, X, ImagePlus } from "lucide-react";
 import Link from "next/link";
 
 const BRANDS = ["Toyota", "VinFast", "Hyundai", "Ford", "Mitsubishi", "Kia", "Mazda", "Honda", "Suzuki", "MG", "Peugeot", "Mercedes", "BMW", "Audi", "Lexus", "Porsche", "LandRover", "Nissan", "Subaru", "Volvo", "Volkswagen", "Tesla", "BYD", "Khac"];
@@ -21,12 +21,14 @@ export default function PartnerEditCarPage({ params }) {
   const [initialLoad, setInitialLoad] = useState(true);
 
   const [formData, setFormData] = useState({
-    name: "", image: "", gallery: "", priceOriginal: 0, priceDiscount: 0,
+    name: "", priceOriginal: 0, priceDiscount: 0,
     brand: "Toyota", category: "Sedan", tier: "Standard",
     transmission: "Automatic", fuel: "Gasoline", location: "HaNoi",
-    seats: 4, address: "", deliveryFee: 0, 
+    seats: 4, address: "", deliveryFee: 0, description: "",
     amenities: "", rules: "", requirements: "",
-    licensePlate: "", ownerCCCD: ""
+    licensePlate: "", ownerCCCD: "",
+    images: [], // 🚀 BỔ SUNG STATE LƯU MẢNG ẢNH HIỂN THỊ
+    registrationPaper: "", inspectionCertificate: "", insurancePaper: ""
   });
 
   useEffect(() => {
@@ -42,16 +44,23 @@ export default function PartnerEditCarPage({ params }) {
           let safeAmenities = [];
           try { safeAmenities = Array.isArray(data.amenities) ? data.amenities : JSON.parse(data.amenities || "[]"); } catch(e) {}
 
+          // 🚀 GỘP ẢNH CHÍNH VÀ ẢNH PHỤ VÀO 1 MẢNG ĐỂ HIỂN THỊ
+          const loadedImages = [data.image, ...safeGallery].filter(Boolean);
+
           setFormData({
             ...data,
-            gallery: safeGallery.join(", "),
+            images: loadedImages,
             amenities: safeAmenities.join(", "),
             address: data.address || "",
+            description: data.description || "",
             rules: data.rules || "",
             requirements: data.requirements || "",
             deliveryFee: data.deliveryFee || 0,
             licensePlate: data.licensePlate || "",
-            ownerCCCD: data.ownerCCCD || ""
+            ownerCCCD: data.ownerCCCD || "",
+            registrationPaper: data.registrationPaper || "",
+            inspectionCertificate: data.inspectionCertificate || "",
+            insurancePaper: data.insurancePaper || ""
           });
         }
       } catch (error) {
@@ -67,17 +76,68 @@ export default function PartnerEditCarPage({ params }) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // 🚀 HÀM UPLOAD NHIỀU ẢNH XE (GIỐNG TRANG ĐĂNG KÝ)
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (formData.images.length + files.length > 5) return alert("Tối đa 5 ảnh hiển thị");
+    
+    const base64Images = await Promise.all(files.map(file => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+        });
+    }));
+    
+    setFormData(prev => ({ ...prev, images: [...prev.images, ...base64Images] }));
+  };
+
+  const removeImage = (idx) => {
+    setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
+  };
+
+  // HÀM UPLOAD GIẤY TỜ
+  const handleDocUpload = async (e, field) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      return alert("Vui lòng chọn ảnh có dung lượng dưới 5MB để đảm bảo tốc độ tải!");
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, [field]: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeDoc = (field) => {
+    setFormData(prev => ({ ...prev, [field]: "" }));
+  };
+
   const handleSubmit = async (e: any) => {
     e.preventDefault();
+    if (!formData.registrationPaper) return alert("Vui lòng tải lên mặt trước Giấy đăng ký xe (Cà vẹt)!");
+    if (!formData.inspectionCertificate) return alert("Vui lòng tải lên Giấy chứng nhận Đăng kiểm!");
+    if (!formData.insurancePaper) return alert("Vui lòng tải lên Bảo hiểm xe!");
+    if (formData.images.length === 0) return alert("Vui lòng tải lên ít nhất 1 ảnh hiển thị xe!");
     setLoading(true);
 
+    // Tách riêng images ra khỏi phần còn lại của formData
+    const { images, ...restFormData } = formData;
+
     const payload = {
-      ...formData,
+      ...restFormData, // Chỉ gửi các trường còn lại
       priceOriginal: Number(formData.priceOriginal) || 0,
       priceDiscount: Number(formData.priceDiscount) || 0,
       seats: Number(formData.seats) || 5,
       deliveryFee: Number(formData.deliveryFee) || 0,
-      gallery: formData.gallery.split(',').map(item => item.trim()).filter(Boolean),
+      
+      // Gán đúng tên cột cho Prisma
+      image: images[0] || "",
+      gallery: images.slice(1) || [],
+
       amenities: formData.amenities.split(',').map(item => item.trim()).filter(Boolean)
     };
 
@@ -90,7 +150,7 @@ export default function PartnerEditCarPage({ params }) {
 
       if (res.ok) {
         alert("Đã cập nhật thông tin xe thành công! 🎉");
-        router.push("/partner/dashboard"); // 🚀 Chuyển về trang của đối tác
+        router.push("/partner/dashboard"); 
         router.refresh(); 
       } else {
         const errorData = await res.json();
@@ -151,13 +211,29 @@ export default function PartnerEditCarPage({ params }) {
                 <input required type="number" name="priceDiscount" value={formData.priceDiscount} onChange={handleChange} className="w-full mt-1 p-3 rounded-xl border bg-white" />
               </div>
 
-              <div className="col-span-full border-t border-gray-200 pt-4 mt-2">
-                <label className="text-xs font-bold text-gray-700">Link hình ảnh CHÍNH (URL hoặc Base64)</label>
-                <input required name="image" value={formData.image} onChange={handleChange} className="w-full mt-1 p-3 rounded-xl border bg-white" />
-              </div>
               <div className="col-span-full">
-                <label className="text-xs font-bold text-gray-700">Bộ sưu tập ảnh (Gallery) - Phân cách bằng dấu phẩy</label>
-                <textarea name="gallery" value={formData.gallery} onChange={handleChange} className="w-full mt-1 p-3 rounded-xl border bg-white h-20" />
+                <label className="text-xs font-bold text-gray-700">Mô tả xe</label>
+                <textarea rows={3} name="description" value={formData.description} onChange={handleChange} className="w-full mt-1 p-3 rounded-xl border bg-white" />
+              </div>
+
+              {/* 🚀 GIAO DIỆN UPLOAD ẢNH HIỂN THỊ NHƯ BÊN TRANG ĐĂNG KÝ */}
+              <div className="col-span-full border-t border-gray-200 pt-6 mt-2">
+                <label className="text-xs font-bold text-gray-700 mb-3 block">Hình ảnh hiển thị (Tối đa 5 ảnh) <span className="text-red-500">*</span></label>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    {formData.images.length < 5 && (
+                        <label className="border-2 border-dashed border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer h-24 relative transition-all">
+                            <ImagePlus className="text-blue-500 mb-1" size={24} />
+                            <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageUpload} />
+                        </label>
+                    )}
+                    {formData.images.map((img, idx) => (
+                        <div key={idx} className="relative rounded-2xl overflow-hidden h-24 group border border-gray-200">
+                            <img src={img} className="w-full h-full object-cover" />
+                            <button type="button" onClick={() => removeImage(idx)} className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-all"><X/></button>
+                            {idx === 0 && <span className="absolute bottom-1 left-1 bg-blue-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">Ảnh chính</span>}
+                        </div>
+                    ))}
+                </div>
               </div>
             </div>
 
@@ -241,6 +317,80 @@ export default function PartnerEditCarPage({ params }) {
               <div>
                 <label className="text-xs font-bold text-gray-700">Lưu ý & Phụ thu</label>
                 <textarea name="rules" value={formData.rules} onChange={handleChange} className="w-full mt-1 p-3 rounded-xl border bg-white h-20" />
+              </div>
+            </div>
+
+            {/* 6. KHU VỰC CẬP NHẬT GIẤY TỜ PHÁP LÝ */}
+            <div className="bg-red-50/50 p-6 rounded-[24px] border border-red-100 mb-8">
+              <div className="mb-6">
+                <h3 className="text-lg font-black text-red-700 uppercase italic flex items-center gap-2">
+                  <ShieldCheck size={20} /> Cập nhật Hồ sơ pháp lý
+                </h3>
+                <p className="text-xs text-red-600/80 font-medium mt-1">
+                  Chỉ cập nhật khi bạn vừa mới thay đổi/gia hạn giấy tờ pháp lý của xe.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest">
+                    1. Mặt trước Cà vẹt
+                  </label>
+                  <div className="relative border-2 border-dashed border-gray-300 bg-white rounded-2xl p-4 flex flex-col items-center justify-center h-40 hover:bg-red-50 hover:border-red-400 transition-all group overflow-hidden shadow-inner">
+                    {formData.registrationPaper ? (
+                      <>
+                        <img src={formData.registrationPaper} className="absolute inset-0 w-full h-full object-cover" />
+                        <button type="button" onClick={() => removeDoc('registrationPaper')} className="absolute top-2 right-2 bg-black/50 p-1.5 rounded-full text-white hover:bg-red-600 transition-colors z-10"><X size={14}/></button>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="text-gray-300 group-hover:text-red-500 mb-2 transition-colors" size={32} />
+                        <span className="text-[10px] font-bold text-gray-400">Bấm tải ảnh mới</span>
+                      </>
+                    )}
+                    <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-0" onChange={(e) => handleDocUpload(e, 'registrationPaper')} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest">
+                    2. Giấy Đăng kiểm
+                  </label>
+                  <div className="relative border-2 border-dashed border-gray-300 bg-white rounded-2xl p-4 flex flex-col items-center justify-center h-40 hover:bg-red-50 hover:border-red-400 transition-all group overflow-hidden shadow-inner">
+                    {formData.inspectionCertificate ? (
+                      <>
+                        <img src={formData.inspectionCertificate} className="absolute inset-0 w-full h-full object-cover" />
+                        <button type="button" onClick={() => removeDoc('inspectionCertificate')} className="absolute top-2 right-2 bg-black/50 p-1.5 rounded-full text-white hover:bg-red-600 transition-colors z-10"><X size={14}/></button>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="text-gray-300 group-hover:text-red-500 mb-2 transition-colors" size={32} />
+                        <span className="text-[10px] font-bold text-gray-400">Bấm tải ảnh mới</span>
+                      </>
+                    )}
+                    <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-0" onChange={(e) => handleDocUpload(e, 'inspectionCertificate')} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest">
+                    3. Bảo hiểm
+                  </label>
+                  <div className="relative border-2 border-dashed border-gray-300 bg-white rounded-2xl p-4 flex flex-col items-center justify-center h-40 hover:bg-red-50 hover:border-red-400 transition-all group overflow-hidden shadow-inner">
+                    {formData.insurancePaper ? (
+                      <>
+                        <img src={formData.insurancePaper} className="absolute inset-0 w-full h-full object-cover" />
+                        <button type="button" onClick={() => removeDoc('insurancePaper')} className="absolute top-2 right-2 bg-black/50 p-1.5 rounded-full text-white hover:bg-red-600 transition-colors z-10"><X size={14}/></button>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="text-gray-300 group-hover:text-red-500 mb-2 transition-colors" size={32} />
+                        <span className="text-[10px] font-bold text-gray-400">Bấm tải ảnh mới</span>
+                      </>
+                    )}
+                    <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-0" onChange={(e) => handleDocUpload(e, 'insurancePaper')} />
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -23,12 +23,27 @@ export async function GET(request: Request) {
       }
     });
 
-    if (!wallet) {
-      wallet = await prisma.wallet.create({
-        data: { userId, balance: 0 },
-        include: { transactions: true }
-      });
+    // ĐOẠN CODE MỚI ĐÃ SỬA LỖI
+if (!wallet) {
+  // 1. Tìm thông tin của User hiện tại trước để lấy tên và SĐT
+  const currentUser = await prisma.user.findUnique({
+    where: { id: Number(userId) }
+  });
+
+  // 2. Tạo ví mới và truyền đầy đủ dữ liệu bắt buộc
+  wallet = await prisma.wallet.create({
+    data: {
+      userId: Number(userId),
+      balance: 0,
+      // Bổ sung ownerName và ownerPhone, nếu User chưa cập nhật thì để chuỗi mặc định
+      ownerName: currentUser?.name || "Chưa cập nhật tên", 
+      ownerPhone: currentUser?.phone || `NO_PHONE_${userId}`, 
+    },
+    include: {
+      transactions: true
     }
+  });
+}
 
     return NextResponse.json({ success: true, wallet });
   } catch (error) {

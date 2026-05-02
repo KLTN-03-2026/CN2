@@ -44,9 +44,9 @@ export async function POST(req: Request) {
 
     // 4. THIẾT KẾ GIAO DIỆN EMAIL (Giao diện chuẩn BonbonCar)
     const mailOptions = {
-      from: '"BonbonCar Support" <no-reply@bonboncar.com>',
+      from: '"ViVuCar Support" <no-reply@vivucar.com>',
       to: user.email, 
-      subject: "🚗 Khôi phục mật khẩu tài khoản BonbonCar",
+      subject: "🚗 Khôi phục mật khẩu tài khoản ViVuCar",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
           <div style="text-align: center; margin-bottom: 20px;">

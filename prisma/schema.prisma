@@ -62,6 +62,10 @@ model Car {
   licensePlate  String?  @unique// Thêm cột lưu Biển số xe
   ownerCCCD     String?  // Thêm cột lưu CCCD chủ xe
   description String?  @db.Text
+  //  KHU VỰC LƯU GIẤY TỜ PHÁP LÝ (Dùng @db.Text vì ảnh Base64 rất dài)
+  registrationPaper     String?   @db.Text
+  inspectionCertificate String?   @db.Text
+  insurancePaper        String?   @db.Text
   
   reviews       Review[]     // Các đánh giá dành cho xe này
 }

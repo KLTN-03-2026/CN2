@@ -25,7 +25,7 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
   
-  // 🚀 Chỉ cần lưu thông tin mã đã apply từ URL
+  // 🚀 Lưu thông tin mã đã apply từ URL
   const [appliedPromo, setAppliedPromo] = useState(null);
 
   // Lấy các tham số từ URL
@@ -70,19 +70,30 @@ export default function CheckoutPage() {
     }
   }, [carId, router, status, session, searchParams]);
 
-  // 🚀 Tự động Validate lại mã giảm giá nếu có trên URL để lấy mức giảm chính xác
+  // 🚀 ĐÃ SỬA LỖI: Tự động Validate lại mã và BẮT BUỘC gửi kèm ngày tháng
   useEffect(() => {
-    if (promoFromUrl) {
+    // Chỉ chạy validate nếu có đủ Mã + Ngày nhận + Ngày trả
+    if (promoFromUrl && startDate && endDate) {
       const validatePromo = async () => {
         try {
           const res = await fetch("/api/promotions/validate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code: promoFromUrl })
+            body: JSON.stringify({ 
+              code: promoFromUrl,
+              startDate: startDate, // Đã thêm ngày nhận
+              endDate: endDate      // Đã thêm ngày trả
+            })
           });
+          
+          const data = await res.json();
+          
           if (res.ok) {
-            const data = await res.json();
             setAppliedPromo(data);
+          } else {
+            // Nếu Backend chặn lại (Lỗi logic như chưa đủ 3 ngày, chưa đủ 7 ngày...)
+            alert(`Lỗi áp dụng mã ưu đãi: ${data.error}`);
+            setAppliedPromo(null);
           }
         } catch (error) {
           console.error("Lỗi xác thực mã giảm giá:", error);
@@ -90,7 +101,7 @@ export default function CheckoutPage() {
       };
       validatePromo();
     }
-  }, [promoFromUrl]);
+  }, [promoFromUrl, startDate, endDate]); // Thêm dependencies để React theo dõi
 
   const billing = useMemo(() => {
     if (!car || !startDate || !endDate) return { days: 0, rentalFee: 0, serviceFee: 120000, deliveryFee: 0, discount: 0, total: 0 };
@@ -307,7 +318,7 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                {/* 🚀 Chỗ này chỉ cần show mã giảm giá đã đọc từ URL, không cần ô input nữa */}
+                {/* Show mã giảm giá đã đọc từ URL */}
                 {billing.discount > 0 && (
                   <div className="flex justify-between text-[10px] font-black text-green-600 uppercase italic">
                     <span>Mã giảm giá ({appliedPromo?.code})</span>

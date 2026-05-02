@@ -2,13 +2,13 @@
 // @ts-nocheck
 "use client";
 
-import { useState, useEffect, useMemo, } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation"; 
 import { useSession } from "next-auth/react";
 import { 
   MapPin, Settings, Fuel, Users, CreditCard, ChevronLeft, 
   AlertCircle, ShieldCheck, CheckCircle2, FileText, Truck,
-  Gift, Loader2, X // 🚀 Bổ sung icon cho Mã giảm giá
+  Gift, Loader2, X 
 } from "lucide-react";
 import Link from "next/link";
 import CarReviews from "@/components/features/CarReviews";
@@ -44,7 +44,6 @@ export default function CarDetailPage() {
   const [isDelivery, setIsDelivery] = useState(false);
   const [isAgreed, setIsAgreed] = useState(false);
 
-  // 🚀 LOGIC MÃ GIẢM GIÁ (Chuyển từ trang Checkout sang đây)
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -79,7 +78,9 @@ export default function CarDetailPage() {
     const eNew = new Date(endDate).getTime();
 
     const isBookingOverlap = car.bookings?.some(b => {
-      if (b.status === "CANCELLED" || b.status === "Đã hủy") return false;
+      const blockedStatuses = ["PENDING", "CONFIRMED", "IN_PROGRESS", "Đang chờ", "Đã xác nhận", "Đang diễn ra"];
+      if (!blockedStatuses.includes(b.status)) return false;
+
       const sOld = new Date(b.startDate).getTime();
       const eOld = new Date(b.endDate).getTime();
       return sNew < eOld && eNew > sOld;
@@ -94,19 +95,31 @@ export default function CarDetailPage() {
     setIsOverlapped(isBookingOverlap || isBlockedOverlap);
   }, [startDate, endDate, car]);
 
-  // 🚀 Hàm xử lý áp dụng mã giảm giá
   const handleApplyPromo = async () => {
     if (!promoCode.trim()) return;
+
+    if (!startDate || !endDate) {
+      alert("Vui lòng chọn ngày nhận và trả xe trước khi áp dụng mã ưu đãi!");
+      return;
+    }
+
     setIsValidating(true);
     try {
       const res = await fetch("/api/promotions/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: promoCode.trim() })
+        body: JSON.stringify({ 
+          code: promoCode.trim(),
+          startDate: startDate, 
+          endDate: endDate      
+        })
       });
+      
       const data = await res.json();
+      
       if (res.ok) {
         setAppliedPromo(data);
+        alert("Áp dụng mã thành công!"); 
       } else {
         alert(data.error || "Mã không hợp lệ");
         setAppliedPromo(null);
@@ -118,15 +131,56 @@ export default function CarDetailPage() {
     }
   };
 
+  // ===============================================================
+  // 🚀 LOGIC TÍNH TIỀN: CÓ THÊM DÒNG GIẢI THÍCH (EXPLANATION)
+  // ===============================================================
   const billing = useMemo(() => {
-    if (!car || !startDate || !endDate || isOverlapped) return { days: 0, rentalFee: 0, deliveryFee: 0, discount: 0, total: 0 };
-    const diff = new Date(endDate).getTime() - new Date(startDate).getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    const finalDays = days <= 0 ? 0 : days;
-    const rentalFee = finalDays * car.priceDiscount;
+    if (!car || !startDate || !endDate || isOverlapped) {
+      return { rentalFee: 0, deliveryFee: 0, discount: 0, total: 0, displayTime: "0 giờ", explanation: "" };
+    }
+
+    const start = new Date(startDate).getTime();
+    const end = new Date(endDate).getTime();
+    
+    if (end <= start) {
+      return { rentalFee: 0, deliveryFee: 0, discount: 0, total: 0, displayTime: "0 giờ", explanation: "" };
+    }
+
+    const totalHours = (end - start) / (1000 * 60 * 60);
+    const fullDays = Math.floor(totalHours / 24);
+    const leftoverHours = totalHours % 24;
+
+    const dailyRate = car.priceDiscount;
+    let rentalFee = fullDays * dailyRate;
+    let explanation = ""; // Chứa lời giải thích cho khách hàng
+
+    // Áp dụng Block tính tiền & Ghi lời giải thích
+    if (fullDays === 0) {
+      if (leftoverHours > 0 && leftoverHours <= 12) {
+        rentalFee = dailyRate * 0.7;
+        explanation = "Thuê dưới 12h: Tính phí Block nửa ngày (70% giá thuê)";
+      } else if (leftoverHours > 12) {
+        rentalFee = dailyRate;
+        explanation = "Thuê trên 12h: Tính phí Block 1 ngày (100% giá thuê)";
+      }
+    } else {
+      if (leftoverHours === 0) {
+        explanation = `Thuê trọn ${fullDays} ngày`;
+      } else if (leftoverHours <= 12) {
+        rentalFee += (dailyRate * 0.7);
+        explanation = `Tính ${fullDays} ngày + Phụ thu nửa ngày (70%) cho ${Math.round(leftoverHours)} giờ vượt mức`;
+      } else {
+        rentalFee += dailyRate;
+        explanation = `Tính ${fullDays} ngày + Phụ thu 1 ngày (100%) cho ${Math.round(leftoverHours)} giờ vượt mức`;
+      }
+    }
+
+    const displayTime = fullDays > 0 
+      ? `${fullDays} ngày ${Math.round(leftoverHours)} giờ` 
+      : `${Math.round(leftoverHours)} giờ`;
+
     const deliveryCost = isDelivery ? (Number(car.deliveryFee) || 0) : 0;
     
-    // 🚀 Tính toán số tiền được giảm
     let discountAmount = 0;
     if (appliedPromo) {
       if (appliedPromo.type === "PERCENT") {
@@ -139,28 +193,28 @@ export default function CarDetailPage() {
     const total = rentalFee + 120000 + deliveryCost - discountAmount;
     
     return {
-      days: finalDays,
-      rentalFee,
+      rentalFee: Math.round(rentalFee),
       deliveryFee: deliveryCost,
-      discount: discountAmount,
-      total: total < 0 ? 0 : total
+      discount: Math.round(discountAmount),
+      total: total < 0 ? 0 : Math.round(total),
+      displayTime,
+      explanation
     };
   }, [car, startDate, endDate, isOverlapped, isDelivery, appliedPromo]);
   
 
   const handleRentNow = () => {
     if (status === "unauthenticated") {
-      alert("Bạn cần đăng nhập để thực hiện đặt chuyến tại ViVuCar!");
+      alert("Bạn cần đăng nhập để thực hiện đặt chuyến tại AutoHub!");
       const currentPath = window.location.pathname + window.location.search;
       router.push(`/?auth=login&callback=${encodeURIComponent(currentPath)}`);
       return;
     }
 
     if (!startDate || !endDate) return alert("Vui lòng chọn ngày nhận và trả xe!");
-    if (billing.days <= 0) return alert("Ngày trả xe phải sau ngày nhận xe ít nhất 1 ngày!");
+    if (billing.total <= 0) return alert("Thời gian thuê không hợp lệ!");
     if (!isAgreed) return alert("Vui lòng đọc và đồng ý với điều khoản dịch vụ!");
     
-    // 🚀 Truyền TẤT CẢ trạng thái (Ngày, Giao xe, Mã KM) qua URL sang trang Checkout
     const promoQuery = appliedPromo ? `&promo=${appliedPromo.code}` : "";
     router.push(`/checkout?carId=${car.id}&start=${startDate}&end=${endDate}&isDelivery=${isDelivery}${promoQuery}`);
   };
@@ -304,7 +358,6 @@ export default function CarDetailPage() {
                 </div>
               </div>
 
-              {/* 🚀 Ô NHẬP MÃ ƯU ĐÃI NẰM TẠI ĐÂY */}
               <div className="bg-gray-50 p-4 rounded-[24px] border border-dashed border-gray-200 mb-6">
                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block italic">Mã giảm giá</label>
                 <div className="flex gap-2">
@@ -338,10 +391,20 @@ export default function CarDetailPage() {
               </div>
 
               <div className={`p-6 rounded-[32px] space-y-3 mb-6 text-white transition-all ${isOverlapped ? 'bg-gray-400 shadow-inner' : 'bg-blue-900 shadow-xl shadow-blue-100'}`}>
-                <div className="flex justify-between items-center text-[10px] opacity-70 font-black uppercase tracking-widest">
-                  <span>Giá thuê ({billing.days} ngày)</span>
-                  <span className="font-bold">{formatCurrency(billing.rentalFee)}</span>
+                
+                {/* 🚀 ĐÃ CẬP NHẬT: THÊM DÒNG EXPLANATION NẰM NGAY DƯỚI GIÁ THUÊ */}
+                <div className="border-b border-white/20 pb-3 mb-3">
+                  <div className="flex justify-between items-center text-[10px] opacity-90 font-black uppercase tracking-widest mb-1">
+                    <span>Giá thuê ({billing.displayTime})</span>
+                    <span className="font-bold text-sm">{formatCurrency(billing.rentalFee)}</span>
+                  </div>
+                  {billing.explanation && (
+                    <p className="text-[9px] text-blue-200 font-medium italic text-right leading-tight">
+                      * {billing.explanation}
+                    </p>
+                  )}
                 </div>
+
                 {isDelivery && (
                   <div className="flex justify-between items-center text-[10px] opacity-70 font-black uppercase tracking-widest">
                     <span>Phí giao xe</span>
@@ -368,14 +431,14 @@ export default function CarDetailPage() {
 
               {isOverlapped && (
                 <div className="flex items-center gap-2 text-red-600 font-black text-[10px] uppercase italic mb-6 animate-pulse px-2">
-                  <AlertCircle size={14} /> Trùng lịch! Xe đã có người đặt hoặc chủ xe bận.
+                  <AlertCircle size={14} /> Trùng lịch! Xe đã có người đặt hoặc đang lăn bánh.
                 </div>
               )}
 
               <div className="flex items-start gap-3 mb-6 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
                 <input type="checkbox" id="terms-agree" checked={isAgreed} onChange={(e) => setIsAgreed(e.target.checked)} className="mt-0.5 w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0" />
                 <label htmlFor="terms-agree" className="text-[11px] text-gray-600 cursor-pointer select-none leading-relaxed font-medium">
-                  Tôi đã đọc và đồng ý với các <Link href="/policies/terms" target="_blank" className="font-bold text-blue-600 hover:underline">Điều kiện giao dịch</Link>, <Link href="/policies/delivery" target="_blank" className="font-bold text-blue-600 hover:underline">Quy chế giao nhận</Link> và bản mẫu <Link href="/policies/contract" target="_blank" className="font-bold text-blue-600 hover:underline uppercase">Hợp đồng thuê xe</Link> của nền tảng ViVuCar.
+                  Tôi đã đọc và đồng ý với các <Link href="/policies/terms" target="_blank" className="font-bold text-blue-600 hover:underline">Điều kiện giao dịch</Link>, <Link href="/policies/delivery" target="_blank" className="font-bold text-blue-600 hover:underline">Quy chế giao nhận</Link> và bản mẫu <Link href="/policies/contract" target="_blank" className="font-bold text-blue-600 hover:underline uppercase">Hợp đồng thuê xe</Link> của nền tảng AutoHub.
                 </label>
               </div>
 

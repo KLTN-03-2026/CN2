@@ -272,10 +272,18 @@ export default function AdminPromotions() {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[8px] font-black text-gray-400 ml-2 uppercase italic tracking-widest">Loại Voucher</label>
-                  <select value={formData.type} className="w-full p-4 bg-gray-50 rounded-2xl font-black uppercase italic outline-none cursor-pointer border-2 border-transparent focus:border-blue-600 transition-all" onChange={e => setFormData({...formData, type: e.target.value})}>
-                    <option value="PERCENT">GIẢM THEO PHẦN TRĂM (%)</option>
-                    <option value="AMOUNT">GIẢM THEO SỐ TIỀN (đ)</option>
-                  </select>
+                  <select 
+    value={formData.type} 
+    className="w-full p-4 bg-gray-50 rounded-2xl font-black uppercase italic outline-none cursor-pointer border-2 border-transparent focus:border-blue-600 transition-all text-sm" 
+    onChange={e => setFormData({...formData, type: e.target.value})}
+  >
+    <option value="NORMAL">MẶC ĐỊNH (Không yêu cầu điều kiện)</option>
+    <option value="NEW_USER">TÂN BINH (Chỉ áp dụng chuyến đầu tiên)</option>
+    <option value="WEEKEND">CUỐI TUẦN (Chỉ áp dụng nhận xe T7, CN)</option>
+    <option value="LONG_TRIP">DÀI NGÀY (Thuê từ 3 ngày trở lên)</option>
+    <option value="LOYALTY_5">KHÁCH QUEN (Chỉ áp dụng chuyến thứ 5)</option>
+    <option value="EARLY_BIRD">ĐẶT SỚM (Yêu cầu đặt trước 7 ngày)</option>
+  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[8px] font-black text-gray-400 ml-2 uppercase italic tracking-widest">Mô tả chương trình</label>

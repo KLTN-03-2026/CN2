@@ -51,7 +51,7 @@ export default function SuccessPage() {
           Đặt xe thành công!
         </h1>
         <p className="text-gray-400 font-bold uppercase text-[10px] tracking-[0.3em] mb-12">
-          Cảm ơn bạn đã tin tưởng BonbonCar v2.0
+          Cảm ơn bạn đã tin tưởng ViVuCar v2.0
         </p>
 
         {/* THẺ TÓM TẮT ĐƠN HÀNG (BIÊN NHẬN) */}

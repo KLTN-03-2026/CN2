@@ -19,6 +19,23 @@ export async function POST(request: Request) {
     // 🔍 Kiểm tra log để chắc chắn ID chuẩn
     console.log("ĐANG TẠO XE CHO USER ID:", currentUserId);
 
+    // Kiểm tra bắt buộc phải có Cà vẹt và Đăng kiểm (Bảo vệ thêm 1 lớp ở Backend)
+    if (!body.registrationPaper || !body.inspectionCertificate) {
+      return NextResponse.json({ error: "Hệ thống từ chối: Thiếu Giấy đăng ký xe hoặc Đăng kiểm!" }, { status: 400 });
+    }
+//  LƯỚI LỌC: Kiểm tra biển số xe đã tồn tại chưa
+if (body.licensePlate) {
+  const existingCar = await prisma.car.findUnique({
+    where: { licensePlate: body.licensePlate }
+  });
+  
+  if (existingCar) {
+    return NextResponse.json(
+      { error: `Biển số xe ${body.licensePlate} đã được đăng ký trên hệ thống!` }, 
+      { status: 400 }
+    );
+  }
+}
     try {
       const newCar = await prisma.car.create({
         data: {
@@ -47,10 +64,17 @@ export async function POST(request: Request) {
           deliveryFee: Number(body.deliveryFee) || 0,
           amenities: body.amenities || [],
 
-          // 🚀 1. ĐÃ BỔ SUNG TRƯỜNG MÔ TẢ (DESCRIPTION)
+          // 1. MÔ TẢ
           description: body.description || "",
 
-          // 🚀 2. ĐÁNH DẤU RÕ ĐÂY LÀ XE CỦA ĐỐI TÁC
+          // ==========================================
+          // 🚀 2. ĐÃ BỔ SUNG LƯU GIẤY TỜ VÀO DATABASE
+          // ==========================================
+          registrationPaper: body.registrationPaper,
+          inspectionCertificate: body.inspectionCertificate,
+          insurancePaper: body.insurancePaper || null,
+
+          // 3. ĐÁNH DẤU RÕ ĐÂY LÀ XE CỦA ĐỐI TÁC
           ownerType: "PARTNER",
           
           user: {

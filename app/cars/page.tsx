@@ -6,7 +6,7 @@ import LiveSearchBar from "@/components/features/LiveSearchBar";
 import { 
   CarFront, Calendar, MapPin, SearchX, 
   RotateCcw, Filter, ChevronRight, Users,
-  Search // 🚀 1. Bổ sung icon Search
+  Search, Banknote
 } from "lucide-react";
 import Link from "next/link";
 import { POPULAR_LOCATIONS } from "@/constants/data"; 
@@ -28,12 +28,14 @@ const LOCATIONS_UI = [
 
 export default async function CarsPage({ searchParams }) {
   const params = await searchParams;
+  
   const locationSearch = params.location || ""; 
   const brandSearch = params.brand || "";       
   const seatsSearch = params.seats || "";
-  const nameSearch = params.name || ""; // 🚀 2. Nhận tham số tìm kiếm tên xe
+  const nameSearch = params.name || ""; 
   const startDateStr = params.start;
   const endDateStr = params.end;
+  const priceRange = params.price || "";
 
   let whereCondition: any = {
     status: "APPROVED" 
@@ -51,12 +53,30 @@ export default async function CarsPage({ searchParams }) {
     whereCondition.seats = parseInt(seatsSearch, 10); 
   }
 
-  // 🚀 3. Logic tìm kiếm tên xe (Không phân biệt chữ hoa/chữ thường)
   if (nameSearch && nameSearch.trim() !== "") {
     whereCondition.name = {
       contains: nameSearch.trim(),
-      mode: "insensitive" // Cho phép gõ "mazda" vẫn tìm ra "Mazda" (chỉ chạy trên PostgreSQL/MongoDB)
+      mode: "insensitive" 
     };
+  }
+
+  // LOGIC LỌC THEO KHOẢNG GIÁ
+  if (priceRange) {
+    const [minStr, maxStr] = priceRange.split("-");
+    const minPrice = parseInt(minStr, 10);
+    
+    whereCondition.priceDiscount = {}; 
+
+    if (!isNaN(minPrice)) {
+      whereCondition.priceDiscount.gte = minPrice;
+    }
+
+    if (maxStr && maxStr !== "max") {
+      const maxPrice = parseInt(maxStr, 10);
+      if (!isNaN(maxPrice)) {
+        whereCondition.priceDiscount.lte = maxPrice;
+      }
+    }
   }
 
   // THUẬT TOÁN LỌC LỊCH TRÌNH "THÉP"
@@ -67,7 +87,7 @@ export default async function CarsPage({ searchParams }) {
     if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
       whereCondition.bookings = {
         none: {
-          status: { in: ["PENDING", "CONFIRMED"] },
+          status: { in: ["PENDING", "CONFIRMED", "IN_PROGRESS"] },
           AND: [
             { startDate: { lt: end } },
             { endDate: { gt: start } }
@@ -99,6 +119,28 @@ export default async function CarsPage({ searchParams }) {
   const locationObj = POPULAR_LOCATIONS.find(l => l.value === locationSearch);
   const locationLabel = locationObj ? locationObj.label : "Toàn quốc";
 
+  // 🚀 ĐÃ BỔ SUNG: Helper render nhãn giá tiền hiển thị thêm mức 2 triệu và 3 triệu
+  const getPriceLabel = (range) => {
+    switch(range) {
+      case "0-500000": return "Dưới 500K";
+      case "500000-1000000": return "500K - 1 Triệu";
+      case "1000000-2000000": return "1 - 2 Triệu";
+      case "2000000-3000000": return "2 - 3 Triệu";
+      case "3000000-max": return "Trên 3 Triệu";
+      default: return range;
+    }
+  }
+
+  const buildFilterUrl = (key, value) => {
+    const currentQuery = new URLSearchParams(params as any);
+    if (value) {
+      currentQuery.set(key, value);
+    } else {
+      currentQuery.delete(key);
+    }
+    return `/cars?${currentQuery.toString()}`;
+  };
+
   return (
     <main className="min-h-screen bg-[#f8fafc] pb-20 pt-32 font-sans">
       <div className="container mx-auto px-4 max-w-7xl">
@@ -115,7 +157,7 @@ export default async function CarsPage({ searchParams }) {
                 {brandSearch ? `Xe ${brandSearch}` : (locationSearch ? `Xe tại ${locationLabel}` : "Tất cả dòng xe")}
               </h1>
               
-              {/* Các Tags bộ lọc hiện tại */}
+              {/* CÁC TAGS BỘ LỌC HIỆN TẠI ĐANG ÁP DỤNG */}
               <div className="flex flex-wrap gap-2 mb-4">
                 {locationSearch && (
                   <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-full border border-blue-100 italic">
@@ -137,10 +179,61 @@ export default async function CarsPage({ searchParams }) {
                     <Calendar size={12}/> {new Date(startDateStr).toLocaleDateString('vi-VN')} - {new Date(endDateStr).toLocaleDateString('vi-VN')}
                   </span>
                 )}
+                {priceRange && (
+                  <span className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-700 text-[10px] font-black uppercase rounded-full border border-red-100 italic">
+                    <Banknote size={12}/> {getPriceLabel(priceRange)}
+                  </span>
+                )}
               </div>
 
-             {/* 🚀 4. THANH TÌM KIẾM NHANH TÊN XE (GÕ TỚI ĐÂU LỌC TỚI ĐÓ) */}
-             <LiveSearchBar />
+              {/* THANH TÌM KIẾM NHANH */}
+              <LiveSearchBar />
+
+              {/* BỘ LỌC GIÁ TIỀN TRỰC QUAN */}
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 italic flex items-center gap-2">
+                  <Banknote size={14} /> Lọc theo mức giá thuê
+                </h3>
+                {/* 🚀 ĐÃ BỔ SUNG: Dải nút bấm lọc giá được thêm đầy đủ */}
+                <div className="flex flex-wrap gap-3">
+                  <Link 
+                    href={buildFilterUrl("price", "")} 
+                    className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase italic transition-all active:scale-95 ${!priceRange ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "bg-white border-2 border-gray-100 text-gray-500 hover:border-blue-300 hover:text-blue-600"}`}
+                  >
+                    Tất cả
+                  </Link>
+                  <Link 
+                    href={buildFilterUrl("price", "0-500000")} 
+                    className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase italic transition-all active:scale-95 ${priceRange === "0-500000" ? "bg-red-500 text-white shadow-lg shadow-red-200" : "bg-white border-2 border-gray-100 text-gray-500 hover:border-red-300 hover:text-red-500"}`}
+                  >
+                    Dưới 500K
+                  </Link>
+                  <Link 
+                    href={buildFilterUrl("price", "500000-1000000")} 
+                    className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase italic transition-all active:scale-95 ${priceRange === "500000-1000000" ? "bg-red-500 text-white shadow-lg shadow-red-200" : "bg-white border-2 border-gray-100 text-gray-500 hover:border-red-300 hover:text-red-500"}`}
+                  >
+                    500K - 1 Triệu
+                  </Link>
+                  <Link 
+                    href={buildFilterUrl("price", "1000000-2000000")} 
+                    className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase italic transition-all active:scale-95 ${priceRange === "1000000-2000000" ? "bg-red-500 text-white shadow-lg shadow-red-200" : "bg-white border-2 border-gray-100 text-gray-500 hover:border-red-300 hover:text-red-500"}`}
+                  >
+                    1 - 2 Triệu
+                  </Link>
+                  <Link 
+                    href={buildFilterUrl("price", "2000000-3000000")} 
+                    className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase italic transition-all active:scale-95 ${priceRange === "2000000-3000000" ? "bg-red-500 text-white shadow-lg shadow-red-200" : "bg-white border-2 border-gray-100 text-gray-500 hover:border-red-300 hover:text-red-500"}`}
+                  >
+                    2 - 3 Triệu
+                  </Link>
+                  <Link 
+                    href={buildFilterUrl("price", "3000000-max")} 
+                    className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase italic transition-all active:scale-95 ${priceRange === "3000000-max" ? "bg-red-500 text-white shadow-lg shadow-red-200" : "bg-white border-2 border-gray-100 text-gray-500 hover:border-red-300 hover:text-red-500"}`}
+                  >
+                    Trên 3 Triệu
+                  </Link>
+                </div>
+              </div>
 
             </div>
           </div>
@@ -150,7 +243,7 @@ export default async function CarsPage({ searchParams }) {
               Tìm thấy {cars.length} lựa chọn
             </div>
             
-            {(locationSearch || brandSearch || startDateStr || seatsSearch || nameSearch) && (
+            {(locationSearch || brandSearch || startDateStr || seatsSearch || nameSearch || priceRange) && (
               <Link 
                 href="/cars" 
                 className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-2 hover:text-blue-600 transition-all group"
@@ -162,7 +255,7 @@ export default async function CarsPage({ searchParams }) {
           </div>
         </div>
 
-        {/* PHẦN HIỂN THỊ KẾT QUẢ */}
+        {/* PHẦN HIỂN THỊ KẾT QUẢ VÀ TRẠNG THÁI TRỐNG */}
         {cars.length > 0 ? (
           <CarSection cars={cars} />
         ) : (
@@ -170,7 +263,7 @@ export default async function CarsPage({ searchParams }) {
             <div className="bg-white rounded-[50px] p-16 text-center border-2 border-dashed border-gray-100">
               <SearchX size={56} className="mx-auto text-gray-200 mb-6" />
               <h2 className="text-2xl font-black text-blue-900 uppercase italic tracking-tighter mb-4">
-                Không tìm thấy xe {brandSearch} {nameSearch ? `"${nameSearch}"` : ""} {seatsSearch ? `${seatsSearch} chỗ` : ""} {locationSearch ? `tại ${locationLabel}` : ""}
+                Không tìm thấy xe {brandSearch} {nameSearch ? `"${nameSearch}"` : ""} {seatsSearch ? `${seatsSearch} chỗ` : ""} {locationSearch ? `tại ${locationLabel}` : ""} {priceRange ? `với mức giá ${getPriceLabel(priceRange)}` : ""}
               </h2>
               <p className="text-gray-400 text-sm font-medium mb-0 max-w-md mx-auto italic">
                 Rất tiếc! Thời gian này các xe đã được đặt hết hoặc không có xe phù hợp. Bạn có thể thử tìm kiếm tên khác hoặc xem các khu vực lân cận dưới đây:

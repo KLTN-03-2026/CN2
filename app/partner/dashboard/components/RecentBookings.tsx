@@ -2,17 +2,60 @@
 // @ts-nocheck
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   ClipboardList, CarFront, CheckCircle2, Clock, 
   XCircle, Hourglass, User as UserIcon, Phone, 
   MapPin, ShieldCheck, ChevronDown, ChevronUp, Banknote, FileText,
-  Truck, MessageSquare // 🚀 Bổ sung icon
+  Truck, MessageSquare, AlertTriangle, Loader2 
 } from "lucide-react";
 
 export default function RecentBookings({ bookings, handleUpdateBookingStatus }) {
   const [visibleCount, setVisibleCount] = useState(4);
   const visibleBookings = bookings.slice(0, visibleCount);
+
+  const [processingId, setProcessingId] = useState(null);
+  
+  // 🚀 STATE ĐỂ QUẢN LÝ THỜI GIAN THỰC (ĐỒNG HỒ ĐẾM NGƯỢC)
+  const [currentTime, setCurrentTime] = useState(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Cập nhật thời gian mỗi 1 phút để đồng hồ đếm ngược tự nhảy số
+  useEffect(() => {
+    setIsMounted(true);
+    setCurrentTime(Date.now());
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000); // 60.000ms = 1 phút
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleNoShow = async (bookingId) => {
+    if (!window.confirm("Xác nhận: Đã quá giờ hẹn nhưng khách không đến nhận xe?\n\nHành động này sẽ HỦY chuyến đi và chuyển tiền đền bù vào ví của bạn. KHÔNG THỂ HOÀN TÁC!")) {
+      return;
+    }
+
+    setProcessingId(bookingId);
+    try {
+      const res = await fetch(`/api/partner/bookings/${bookingId}/no-show`, {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(`Thành công! ${data.message}\nSố tiền nhận: +${data.compensation.toLocaleString('vi-VN')}đ`);
+        window.location.reload(); 
+      } else {
+        alert(data.error || "Có lỗi xảy ra trong quá trình xử lý!");
+      }
+    } catch (error) {
+      alert("Lỗi kết nối máy chủ! Vui lòng thử lại.");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  if (!isMounted) return null; // Chống lỗi Hydration của Next.js
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-8 duration-500 font-sans">
@@ -33,10 +76,22 @@ export default function RecentBookings({ bookings, handleUpdateBookingStatus }) 
           </div>
         ) : (
           visibleBookings.map((booking) => {
-            // 🚀 TÍNH TOÁN TIỀN PHẢI THU THÊM
             const remainingAmount = booking.paymentMethod === 'FULL_PAY' 
               ? 0 
               : (booking.totalPrice - (booking.depositAmount || 0));
+
+            // ==========================================================
+            // 🚀 LOGIC TÍNH TOÁN 15 PHÚT CHỜ ĐỢI
+            // ==========================================================
+            const startMs = new Date(booking.startDate).getTime();
+            const gracePeriodMs = 15 * 60 * 1000; // 15 phút
+            const unlockTimeMs = startMs + gracePeriodMs; 
+            
+            // Đã qua 15 phút chưa?
+            const isNoShowEligible = currentTime >= unlockTimeMs;
+            
+            // Tính số phút còn lại phải đợi
+            const minutesLeft = Math.ceil((unlockTimeMs - currentTime) / 60000);
 
             return (
               <div key={booking.id} className="bg-white border border-gray-100 rounded-[28px] p-6 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all">
@@ -65,7 +120,6 @@ export default function RecentBookings({ bookings, handleUpdateBookingStatus }) 
                         <p className="flex items-center gap-3 text-gray-400 italic text-xs"><ShieldCheck size={16}/> Đang ẩn số điện thoại (Chờ cọc)</p>
                       )}
 
-                      {/* 🚀 ĐÃ SỬA: Đưa giao nhận xe thành các block màu nổi bật */}
                       {booking.isDelivery ? (
                         <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 mt-2">
                           <p className="text-[10px] font-black text-orange-600 uppercase flex items-center gap-1.5 mb-1.5">
@@ -86,7 +140,6 @@ export default function RecentBookings({ bookings, handleUpdateBookingStatus }) 
                         </div>
                       )}
 
-                      {/* 🚀 ĐÃ SỬA: Chuyển ghi chú về đây cho gọn gàng */}
                       {booking.note && (
                         <div className="flex items-start gap-2 bg-blue-50/50 p-3 rounded-xl border border-blue-50 mt-2">
                           <MessageSquare size={14} className="mt-0.5 text-blue-400 shrink-0"/>
@@ -98,14 +151,14 @@ export default function RecentBookings({ bookings, handleUpdateBookingStatus }) 
                       )}
                     </div>
                   </div>
-{/* CỘT 2: THANH TOÁN MỚI CHI TIẾT & THỜI GIAN (Chiếm 4/12) */}
-<div className="lg:col-span-4 flex flex-col justify-center space-y-4 border-t lg:border-t-0 lg:border-l border-gray-100 pt-4 lg:pt-0 lg:pl-6">
+
+                  {/* CỘT 2: THANH TOÁN MỚI CHI TIẾT & THỜI GIAN (Chiếm 4/12) */}
+                  <div className="lg:col-span-4 flex flex-col justify-center space-y-4 border-t lg:border-t-0 lg:border-l border-gray-100 pt-4 lg:pt-0 lg:pl-6">
                     <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 space-y-1.5">
                       <p className="flex items-center gap-2 text-xs font-bold text-green-600"><CheckCircle2 size={14}/> Nhận: {new Date(booking.startDate).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'})}</p>
                       <p className="flex items-center gap-2 text-xs font-bold text-orange-600"><Clock size={14}/> Trả: {new Date(booking.endDate).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'})}</p>
                     </div>
 
-                    {/* 🚀 ĐÃ SỬA LỖI: Hiển thị giao diện xám (Chưa thanh toán) nếu PENDING */}
                     <div className={`${booking.status === 'PENDING' ? 'bg-gray-50 border-gray-200' : 'bg-emerald-50/30 border-emerald-100'} p-4 rounded-2xl border space-y-3`}>
                       <div className={`flex justify-between items-center border-b ${booking.status === 'PENDING' ? 'border-gray-200' : 'border-emerald-100/50'} pb-2`}>
                         <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Tổng tiền cuốc</span>
@@ -142,7 +195,6 @@ export default function RecentBookings({ bookings, handleUpdateBookingStatus }) 
                             </div>
                           </div>
 
-                          {/* NẾU CHƯA TRẢ ĐỦ -> HIỆN PHẦN THU THÊM MÀU ĐỎ */}
                           {remainingAmount > 0 && (
                             <div className="flex justify-between items-center pt-3 border-t border-emerald-100/50 mt-2 bg-red-50/50 -mx-4 -mb-4 p-4 rounded-b-2xl border-x-0 border-b-0 border-red-100">
                               <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Thu thêm khi giao xe</span>
@@ -166,11 +218,35 @@ export default function RecentBookings({ bookings, handleUpdateBookingStatus }) 
                     )}
                     
                     {booking.status === 'CONFIRMED' && (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <p className="text-[10px] font-black text-green-600 uppercase tracking-widest text-center bg-green-50 py-2 rounded-xl border border-green-100">Đã cọc thành công</p>
-                        <button onClick={() => handleUpdateBookingStatus(booking.id, 'IN_PROGRESS')} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-xl transition-all flex justify-center items-center gap-2 shadow-lg shadow-blue-200 active:scale-95">
-                          <CarFront size={16} /> Giao xe cho khách
-                        </button>
+                        
+                        <div className="flex flex-col gap-2">
+                          <button onClick={() => handleUpdateBookingStatus(booking.id, 'IN_PROGRESS')} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest py-3.5 rounded-xl transition-all flex justify-center items-center gap-2 shadow-md shadow-blue-200 active:scale-95">
+                            <CarFront size={16} /> Giao xe
+                          </button>
+
+                          {/* 🚀 ĐÃ BỔ SUNG: KHÓA NÚT 15 PHÚT */}
+                          {isNoShowEligible ? (
+                            <button 
+                              onClick={() => handleNoShow(booking.id)}
+                              disabled={processingId === booking.id}
+                              className="w-full bg-white text-red-600 border border-red-200 hover:bg-red-50 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl transition-all flex justify-center items-center gap-2 active:scale-95 disabled:opacity-50"
+                            >
+                              {processingId === booking.id ? (
+                                <Loader2 size={16} className="animate-spin text-red-400" />
+                              ) : (
+                                <AlertTriangle size={16} />
+                              )}
+                              Khách không đến
+                            </button>
+                          ) : (
+                            <div className="w-full bg-gray-50 text-gray-400 border border-gray-200 font-black text-[9px] uppercase tracking-widest py-3 rounded-xl flex justify-center items-center gap-1.5 cursor-not-allowed select-none">
+                              <Clock size={12} />
+                              {minutesLeft > 0 ? `Mở nút hủy sau ${minutesLeft} phút` : "Đang mở nút hủy..."}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 
