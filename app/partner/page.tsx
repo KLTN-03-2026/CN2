@@ -3,6 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { 
@@ -28,8 +29,10 @@ export default function PartnerRegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   
-  // 🚀 STATE ĐỂ LƯU LỖI TRÙNG BIỂN SỐ
+  // 🚀 STATE ĐỂ LƯU LỖI TRÙNG BIỂN SỐ VÀ HỢP ĐỒNG KÝ QUỸ
   const [licensePlateError, setLicensePlateError] = useState("");
+  const [isAgreed, setIsAgreed] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
 
   const [formData, setFormData] = useState({
     ownerName: "", ownerPhone: "", ownerCCCD: "", licensePlate: "",
@@ -39,8 +42,8 @@ export default function PartnerRegisterPage() {
     location: "HaNoi", address: "", deliveryFee: "0", 
     description: "", 
     amenities: [], 
-    requirements: "Bản gốc GPLX hạng B1 trở lên, CCCD gắn chíp (đối chiếu). Thế chấp 15 triệu đồng hoặc xe máy chính chủ.", 
-    rules: "Giữ vệ sinh xe sạch sẽ, không hút thuốc. Trả xe đúng giờ (quá giờ phụ thu 100k/giờ).", 
+    requirements: "Bản gốc GPLX hạng B1 trở lên, CCCD gắn chíp (đối chiếu). Thế chấp 5 triệu đồng hoặc xe máy chính chủ.", 
+    rules: "Giữ vệ sinh xe sạch sẽ, không hút thuốc. Trả xe đúng giờ (quá giờ phụ thu theo thỏa thuận).", 
     priceOriginal: "", priceDiscount: "", 
     images: [],
     registrationPaper: "", 
@@ -58,7 +61,7 @@ export default function PartnerRegisterPage() {
     }
   }, [session]);
 
-  const amenitiesList = ["Bản đồ", "Bluetooth", "Camera lùi", "Cảm biến lốp", "Cửa sổ trời", "Định vị GPS", "Khe cắm USB", "Lốp dự phòng"];
+  const amenitiesList = ["Bản đồ", "Bluetooth", "Camera lùi", "Cảm biến lốp", "Cửa sổ trời", "Định vị GPS", "Khe cắm USB", "Lốp dự phòng","Camera 360"];
 
   const toggleAmenity = (name) => {
     setFormData(prev => ({
@@ -90,7 +93,6 @@ export default function PartnerRegisterPage() {
     }
   };
 
-  // 🚀 HÀM BẮN API KIỂM TRA TRÙNG BIỂN SỐ KHI GÕ XONG (onBlur)
   const checkLicensePlate = async (plate) => {
     if (!plate) return;
     try {
@@ -104,7 +106,7 @@ export default function PartnerRegisterPage() {
       if (data.exists) {
         setLicensePlateError("❌ Biển số xe này đã được đăng ký trên hệ thống!");
       } else {
-        setLicensePlateError(""); // Không trùng thì xóa lỗi
+        setLicensePlateError(""); 
       }
     } catch (error) {
       console.error("Lỗi kiểm tra biển số:", error);
@@ -130,7 +132,6 @@ export default function PartnerRegisterPage() {
       if (formData.deliveryFee === "") currentErrors.deliveryFee = "Vui lòng nhập phí (nhập 0 nếu miễn phí).";
     }
 
-    // 🚀 CHẶN LẠI NẾU CÓ LỖI NHẬP HOẶC BỊ TRÙNG BIỂN SỐ
     if (Object.keys(currentErrors).length > 0 || licensePlateError !== "") {
       setErrors(currentErrors);
       return; 
@@ -213,7 +214,10 @@ export default function PartnerRegisterPage() {
 
       registrationPaper: formData.registrationPaper,
       inspectionCertificate: formData.inspectionCertificate,
-      insurancePaper: formData.insurancePaper
+      insurancePaper: formData.insurancePaper,
+      
+      // cờ xác nhận hợp đồng điện tử
+      contractAgreed: isAgreed
     };
 
     try {
@@ -223,8 +227,13 @@ export default function PartnerRegisterPage() {
         body: JSON.stringify(dbPayload)
       });
       const data = await res.json();
-      if (res.ok) setStep(4);
-      else alert(data.error || "Lỗi lưu dữ liệu");
+      
+      if (res.ok) {
+        // Bật Modal Ký Quỹ 
+        setShowDepositModal(true);
+      } else {
+        alert(data.error || "Lỗi lưu dữ liệu");
+      }
     } catch (err) {
       alert("Lỗi kết nối Server");
     } finally {
@@ -237,7 +246,7 @@ export default function PartnerRegisterPage() {
   );
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-20 pt-28 font-sans">
+    <main className="min-h-screen bg-gray-50 pb-20 pt-28 font-sans relative">
       <div className="container mx-auto px-4 max-w-4xl bg-white p-8 md:p-12 rounded-[40px] shadow-xl border border-gray-100">
         
         {/* ================= BƯỚC 1 ================= */}
@@ -262,7 +271,6 @@ export default function PartnerRegisterPage() {
                 {errors.ownerCCCD && <p className="text-red-500 text-[10px] font-bold italic flex items-center gap-1"><AlertCircle size={12}/> {errors.ownerCCCD}</p>}
               </div>
 
-              {/* 🚀 Ô BIỂN SỐ XE - GẮN onBlur */}
               <div className="space-y-2">
                 <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Biển số xe <span className="text-red-500">*</span></label>
                 <input 
@@ -432,21 +440,18 @@ export default function PartnerRegisterPage() {
                 </div>
             </div>
 
-            {/* ========================================================= */}
-            {/* 🚀 6. GIAO DIỆN UPLOAD GIẤY TỜ BẢO MẬT CHỈ ADMIN ĐƯỢC XEM */}
-            {/* ========================================================= */}
+            {/* 🚀 GIAO DIỆN UPLOAD GIẤY TỜ BẢO MẬT */}
             <div className="bg-red-50/50 p-6 rounded-[24px] border border-red-100 mb-8">
               <div className="mb-6">
                 <h3 className="text-lg font-black text-red-700 uppercase italic flex items-center gap-2">
                   <ShieldCheck size={20} /> Hồ sơ pháp lý bắt buộc
                 </h3>
                 <p className="text-xs text-red-600/80 font-medium mt-1">
-                  Cung cấp hình ảnh gốc, rõ nét. Dữ liệu này được mã hóa và bảo mật tuyệt đối, <strong className="font-black text-red-700">CHỈ</strong> Quản trị viên hệ thống mới có thể xem để đối soát.
+                  Cung cấp hình ảnh gốc, rõ nét. Dữ liệu này được bảo mật tuyệt đối, <strong className="font-black text-red-700">CHỈ</strong> Quản trị viên hệ thống mới có thể xem để đối soát.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* 6.1. Giấy đăng ký xe (Cà vẹt) */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest">
                     1. Mặt trước Cà vẹt <span className="text-red-500">*</span>
@@ -467,7 +472,6 @@ export default function PartnerRegisterPage() {
                   </div>
                 </div>
 
-                {/* 6.2. Giấy chứng nhận đăng kiểm */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest">
                     2. Giấy Đăng kiểm <span className="text-red-500">*</span>
@@ -488,7 +492,6 @@ export default function PartnerRegisterPage() {
                   </div>
                 </div>
 
-                {/* 6.3. Bảo hiểm xe */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest">
                     3. Bảo hiểm xe <span className="text-red-500">*</span>
@@ -511,8 +514,41 @@ export default function PartnerRegisterPage() {
               </div>
             </div>
 
-            <button type="submit" disabled={isSubmitting} className="w-full py-5 bg-blue-900 text-white font-black uppercase tracking-widest italic rounded-2xl shadow-xl shadow-blue-200 hover:bg-blue-800 transition-all disabled:opacity-70 flex justify-center items-center gap-2">
-              {isSubmitting ? <Loader2 className="animate-spin"/> : "Hoàn tất & Gửi yêu cầu kiểm duyệt"}
+            {/* 🚀 KHỐI XÁC NHẬN HỢP ĐỒNG ĐIỆN TỬ */}
+            <div className="mt-8 p-6 bg-blue-50/50 border border-blue-100 rounded-2xl animate-in fade-in">
+              <div className="flex items-start gap-4">
+                <div className="mt-1">
+                  <input 
+                    type="checkbox" 
+                    id="agreeContract"
+                    checked={isAgreed}
+                    onChange={(e) => setIsAgreed(e.target.checked)}
+                    className="w-6 h-6 rounded-md border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="agreeContract" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Tôi cam kết thông tin cung cấp là chính xác và đồng ý ký xác nhận 
+                    {/* 🚀 SỬA LINK THÀNH BẢN MẪU (TEMPLATE) */}
+                    <Link href="/partner/contract" target="_blank" className="text-blue-600 font-bold underline hover:text-blue-800 mx-1">
+                      Hợp đồng hợp tác điện tử
+                    </Link> 
+                    của ViVuCar.
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                    * Bằng việc tích chọn, bạn đã thực hiện hành vi ký điện tử. Sau khi hệ thống cấp mã ID xe thành công, hợp đồng chính thức ghi nhận thông tin của bạn sẽ được tạo lập tự động. Bạn có thể xem và in hợp đồng tại trang Quản lý xe.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* NÚT SUBMIT ĐÃ BỔ SUNG ĐIỀU KIỆN KHÓA */}
+            <button 
+              type="submit" 
+              disabled={!isAgreed || isSubmitting} 
+              className="w-full mt-6 bg-blue-900 text-white font-black py-4 rounded-xl hover:bg-blue-800 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed uppercase flex justify-center items-center gap-2"
+            >
+              {isSubmitting ? <Loader2 className="animate-spin"/> : "GỬI YÊU CẦU DUYỆT XE & ĐÓNG KÝ QUỸ"}
             </button>
           </form>
         )}
@@ -522,10 +558,11 @@ export default function PartnerRegisterPage() {
            <div className="text-center py-12 animate-in zoom-in duration-500">
               <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle2 size={48} className="text-green-500" /></div>
               <h2 className="text-3xl font-black text-blue-900 uppercase italic">Gửi hồ sơ thành công!</h2>
-              <p className="text-gray-500 font-bold mt-2">Hệ thống sẽ kiểm duyệt thông tin và pháp lý xe của bạn trong vòng 24h tới.</p>
+              <p className="text-gray-500 font-bold mt-2">Hệ thống sẽ đối soát giao dịch ký quỹ và kiểm duyệt pháp lý xe của bạn trong vòng 2-4 tiếng làm việc.</p>
               <div className="flex gap-4 justify-center mt-8">
                 <button onClick={() => {
                   setStep(1); 
+                  setIsAgreed(false);
                   setFormData(prev => ({
                     ...prev, licensePlate: "", carModel: "", description: "", 
                     images: [], registrationPaper: "", inspectionCertificate: "", insurancePaper: "",
@@ -537,6 +574,44 @@ export default function PartnerRegisterPage() {
            </div>
         )}
       </div>
+
+      {/* 🚀 MODAL HƯỚNG DẪN CHUYỂN KHOẢN KÝ QUỸ */}
+      {showDepositModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
+            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ShieldCheck size={32} />
+            </div>
+            <h2 className="text-xl font-black text-blue-900 uppercase mb-2">Đăng ký hồ sơ thành công!</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Hệ thống đã ghi nhận hồ sơ xe của bạn. Để xe được duyệt và bắt đầu cho thuê, vui lòng hoàn tất nộp phí ký quỹ trách nhiệm.
+            </p>
+            
+            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 text-left mb-6">
+              <div className="space-y-3 text-sm">
+                <p className="flex justify-between border-b border-gray-200 pb-2"><span className="text-gray-500">Số tiền:</span> <strong className="text-red-600 text-lg">2.000.000 VNĐ</strong></p>
+                <p className="flex justify-between border-b border-gray-200 pb-2"><span className="text-gray-500">Ngân hàng:</span> <strong>MB Bank</strong></p>
+                <p className="flex justify-between border-b border-gray-200 pb-2"><span className="text-gray-500">Số tài khoản:</span> <strong>0123456789</strong></p>
+                <p className="flex justify-between border-b border-gray-200 pb-2"><span className="text-gray-500">Chủ tài khoản:</span> <strong>CTY AUTOHUB AI</strong></p>
+                <p className="flex justify-between items-center pt-1"><span className="text-gray-500">Nội dung CK:</span> <strong className="text-blue-600 bg-blue-50 px-3 py-1 rounded border border-blue-100">KYQUY {formData.licensePlate}</strong></p>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => {
+                setShowDepositModal(false);
+                setStep(4);
+              }} 
+              className="w-full bg-blue-900 text-white font-bold py-4 rounded-xl hover:bg-blue-800 transition-all uppercase tracking-widest text-sm"
+            >
+              Tôi Đã Nắm Thông Tin
+            </button>
+            <p className="text-[10px] text-gray-400 mt-4 italic">
+              * Giao dịch của bạn sẽ được bảo mật tuyệt đối bởi nền tảng.
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

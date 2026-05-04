@@ -280,27 +280,32 @@ export default function CarDetailPage() {
                 <MapPin className="text-blue-600" /> Vị trí & Giao nhận
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className={`cursor-pointer p-6 rounded-3xl border-2 transition-all flex flex-col gap-2 ${!isDelivery ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'}`}>
-                  <div className="flex justify-between items-center">
-                    <span className="font-black uppercase tracking-tighter text-blue-900">Tự đến nhận xe</span>
-                    <input type="radio" name="delivery" className="hidden" checked={!isDelivery} onChange={() => setIsDelivery(false)} />
-                    {!isDelivery && <CheckCircle2 className="text-blue-600 w-5 h-5" />}
-                  </div>
-                  <p className="text-sm font-medium text-gray-600">{car.address || "Đang cập nhật địa chỉ bãi xe"}</p>
-                  <span className="text-[10px] font-black text-green-600 uppercase mt-2">Miễn phí</span>
-                </label>
-                <label className={`cursor-pointer p-6 rounded-3xl border-2 transition-all flex flex-col gap-2 ${(Number(car.deliveryFee) === 0 || !car.deliveryFee) ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-100' : (isDelivery ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200')}`}>
-                  <div className="flex justify-between items-center">
-                    <span className="font-black uppercase tracking-tighter text-blue-900">Giao xe tận nơi</span>
-                    <input type="radio" name="delivery" className="hidden" disabled={!Number(car.deliveryFee)} checked={isDelivery} onChange={() => setIsDelivery(true)} />
-                    {isDelivery && <CheckCircle2 className="text-blue-600 w-5 h-5" />}
-                  </div>
-                  <p className="text-sm font-medium text-gray-600">Nhận xe tại nhà hoặc sân bay</p>
-                  <span className="text-[10px] font-black text-orange-600 uppercase mt-2">
-                    {Number(car.deliveryFee) ? `Phí giao xe: ${formatCurrency(car.deliveryFee)}` : "Không hỗ trợ giao xe"}
-                  </span>
-                </label>
-              </div>
+  <label className={`cursor-pointer p-6 rounded-3xl border-2 transition-all flex flex-col gap-2 ${!isDelivery ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200'}`}>
+    <div className="flex justify-between items-center">
+      <span className="font-black uppercase tracking-tighter text-blue-900">Tự đến nhận xe</span>
+      <input type="radio" name="delivery" className="hidden" checked={!isDelivery} onChange={() => setIsDelivery(false)} />
+      {!isDelivery && <CheckCircle2 className="text-blue-600 w-5 h-5" />}
+    </div>
+    <p className="text-sm font-medium text-gray-600">{car.address || "Đang cập nhật địa chỉ bãi xe"}</p>
+    <span className="text-[10px] font-black text-green-600 uppercase mt-2">Miễn phí</span>
+  </label>
+  
+  <label className={`cursor-pointer p-6 rounded-3xl border-2 transition-all flex flex-col gap-2 ${(Number(car.deliveryFee) === 0 || !car.deliveryFee) ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-100' : (isDelivery ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-blue-200')}`}>
+    <div className="flex justify-between items-center">
+      <span className="font-black uppercase tracking-tighter text-blue-900">Giao xe tận nơi</span>
+      <input type="radio" name="delivery" className="hidden" disabled={!Number(car.deliveryFee)} checked={isDelivery} onChange={() => setIsDelivery(true)} />
+      {isDelivery && <CheckCircle2 className="text-blue-600 w-5 h-5" />}
+    </div>
+    {/* 🚀 ĐÃ CẬP NHẬT CHỖ NÀY: Thay đổi text và thêm cảnh báo bán kính */}
+    <p className="text-sm font-medium text-gray-600">Nhận xe tại nhà (Nội thành {car.location})</p>
+    <span className="text-[10px] font-black text-orange-600 uppercase mt-1">
+      {Number(car.deliveryFee) ? `Phí cơ bản: ${formatCurrency(car.deliveryFee)}` : "Không hỗ trợ giao xe"}
+    </span>
+    <p className="text-[9px] text-gray-500 italic mt-1 leading-tight">
+      * Áp dụng trong bán kính 10km. Xa hơn chủ xe sẽ phụ thu thêm.
+    </p>
+  </label>
+</div>
             </div>
 
             {safeAmenities && safeAmenities.length > 0 && (

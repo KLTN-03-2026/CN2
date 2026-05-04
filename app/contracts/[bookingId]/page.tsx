@@ -22,7 +22,7 @@ export default async function ContractPage({ params }: { params: Promise<{ booki
     where: { id: bookingId },
     include: { 
       car: {
-        include: { user: true } // Lấy thông tin chủ xe
+        include: { user: true }
       }, 
       user: true 
     }
@@ -40,28 +40,18 @@ export default async function ContractPage({ params }: { params: Promise<{ booki
   const contractDate = new Date(booking.createdAt);
 
   return (
-    // 🚀 SỬA LỖI PHÔNG CHỮ: Đổi font-serif thành font-sans ở dòng dưới đây
     <div className="min-h-screen bg-gray-200 pt-24 pb-12 font-sans text-gray-900 flex flex-col items-center">
       
-      {/* 🚀 VŨ KHÍ BÍ MẬT: Bơm CSS ép buộc trình duyệt khi In */}
+      {/* CSS ép buộc trình duyệt khi In */}
       <style dangerouslySetInnerHTML={{
         __html: `
           @media print {
-            /* 1. "Trảm" toàn bộ Navbar, Header, Footer trên toàn hệ thống */
             nav, header, footer { display: none !important; }
-            
-            /* 2. Ẩn cụm nút điều khiển */
             .hide-on-print { display: none !important; }
-            
-            /* 3. Đổi nền trang web thành màu trắng tinh */
             body, html, main, .bg-gray-200 { background-color: white !important; }
-            
-            /* 4. Xóa luôn mấy chữ localhost, ngày tháng, số trang ở góc của trình duyệt */
             @page { margin: 0; }
-            
-            /* 5. Căn lề lùi vào cho tờ A4 đỡ bị lẹm chữ khi in thật */
             #printable-contract {
-              padding: 20mm !important;
+              padding: 15mm 20mm !important;
               box-shadow: none !important;
               border: none !important;
             }
@@ -78,10 +68,10 @@ export default async function ContractPage({ params }: { params: Promise<{ booki
       </div>
 
       {/* TỜ GIẤY A4 */}
-      <div id="printable-contract" className="bg-white w-full max-w-4xl p-12 md:p-20 shadow-2xl rounded-2xl">
+      <div id="printable-contract" className="bg-white w-full max-w-4xl p-10 md:p-16 shadow-2xl rounded-2xl">
         
         {/* TIÊU ĐỀ QUỐC HIỆU */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-8">
           <h2 className="font-bold text-lg uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h2>
           <h3 className="font-bold text-base underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</h3>
           <p className="italic text-sm mt-4 text-gray-500">
@@ -90,80 +80,96 @@ export default async function ContractPage({ params }: { params: Promise<{ booki
           </p>
         </div>
 
-        <h1 className="text-2xl md:text-3xl font-black text-center mb-10 uppercase">HỢP ĐỒNG CHO THUÊ XE TỰ LÁI</h1>
+        <h1 className="text-2xl font-black text-center mb-8 uppercase tracking-wide">HỢP ĐỒNG CHO THUÊ XE Ô TÔ TỰ LÁI</h1>
 
         {/* THÔNG TIN HAI BÊN */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 border-b border-gray-200 pb-8 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6 border-b border-gray-200 pb-6 text-sm">
             <div>
-                <h3 className="font-black text-blue-900 uppercase mb-4 flex items-center gap-2 border-l-4 border-blue-600 pl-2">
-                    Bên A (Chủ xe)
+                <h3 className="font-black text-blue-900 uppercase mb-3 flex items-center gap-2 border-l-4 border-blue-600 pl-2">
+                    Bên A (Chủ xe / Bên Cho Thuê)
                 </h3>
-                <ul className="space-y-3 font-medium">
+                <ul className="space-y-2 font-medium">
                     <li><span className="text-gray-500">Đại diện:</span> <span className="font-bold text-gray-900 uppercase">{ownerName}</span></li>
                     <li><span className="text-gray-500">Số điện thoại:</span> <span className="font-bold text-gray-900">{ownerPhone}</span></li>
-                    <li><span className="text-gray-500">Vai trò:</span> Chủ sở hữu phương tiện.</li>
+                    <li><span className="text-gray-500">Nền tảng kết nối:</span> Ứng dụng ViVuCar (AutoHub AI)</li>
                 </ul>
             </div>
 
             <div>
-                <h3 className="font-black text-red-700 uppercase mb-4 flex items-center gap-2 border-l-4 border-red-600 pl-2">
-                    Bên B (Người thuê)
+                <h3 className="font-black text-red-700 uppercase mb-3 flex items-center gap-2 border-l-4 border-red-600 pl-2">
+                    Bên B (Người Thuê)
                 </h3>
-                <ul className="space-y-3 font-medium">
+                <ul className="space-y-2 font-medium">
                     <li><span className="text-gray-500">Ông/Bà:</span> <span className="font-bold text-gray-900 uppercase">{renterName}</span></li>
                     <li><span className="text-gray-500">Số điện thoại:</span> <span className="font-bold text-gray-900">{renterPhone}</span></li>
-                    <li><span className="text-gray-500">CCCD/GPLX số:</span> ....................................</li>
+                    <li><span className="text-gray-500">CCCD số:</span> ....................................</li>
+                    <li><span className="text-gray-500">GPLX số:</span> ................. Hạng: ............</li>
                 </ul>
             </div>
         </div>
 
-        <p className="font-bold italic mt-4 mb-6">Hai bên thống nhất ký kết Hợp đồng thuê xe với các điều khoản sau:</p>
+        <p className="font-bold italic mt-2 mb-4 text-sm">Sau khi bàn bạc, hai bên thống nhất ký kết Hợp đồng thuê xe ô tô tự lái với các điều khoản sau đây:</p>
 
-        {/* ĐIỀU KHOẢN HỢP ĐỒNG */}
-        <div className="space-y-6 text-justify text-sm leading-relaxed">
+        {/* ĐIỀU KHOẢN HỢP ĐỒNG CHI TIẾT */}
+        <div className="space-y-5 text-justify text-[13px] leading-relaxed">
+          
           <section>
-            <h3 className="font-bold text-base text-gray-900">ĐIỀU 1: THÔNG TIN TÀI SẢN THUÊ & THỜI GIAN</h3>
-            <ul className="list-disc pl-5 mt-2 space-y-1">
-              <li><strong>Loại xe:</strong> <span className="font-bold text-blue-700 uppercase">{carName}</span></li>
-              <li><strong>Biển kiểm soát:</strong> {licensePlate}</li>
+            <h3 className="font-bold text-[14px] text-gray-900 mb-1">ĐIỀU 1: THÔNG TIN TÀI SẢN THUÊ & THỜI GIAN</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li><strong>Tài sản thuê:</strong> Ô tô hiệu <span className="font-bold text-blue-700 uppercase">{carName}</span>, Biển kiểm soát: <strong>{licensePlate}</strong>.</li>
+              <li>Bên A giao xe tình trạng hoạt động bình thường, đầy đủ giấy tờ (Bản sao công chứng hoặc Bản gốc có biên nhận). Mức nhiên liệu và tình trạng xước xát (nếu có) được hai bên ghi nhận bằng hình ảnh thực tế lúc giao xe.</li>
               <li><strong>Thời gian nhận xe:</strong> <span className="text-green-700 font-bold">{formatDate(booking.startDate)}</span></li>
               <li><strong>Thời gian trả xe:</strong> <span className="text-red-600 font-bold">{formatDate(booking.endDate)}</span></li>
-              <li><strong>Địa điểm giao nhận:</strong> {booking.location || "Theo thỏa thuận hai bên"}</li>
+              <li><strong>Địa điểm giao nhận:</strong> {booking.location || "Theo thỏa thuận trực tiếp giữa hai bên."}</li>
             </ul>
           </section>
 
           <section>
-            <h3 className="font-bold text-base text-gray-900">ĐIỀU 2: CHI PHÍ & THANH TOÁN</h3>
-            <ul className="list-disc pl-5 mt-2 space-y-1">
-              <li><strong>Tổng tiền thuê:</strong> <span className="text-lg font-bold text-blue-700">{formatCurrency(booking.totalPrice)}</span></li>
-              <li><strong>Phí bảo hiểm vật chất xe:</strong> Sàn ViVuCar thu 120.000 VNĐ (Đã bao gồm trong tổng tiền) để kích hoạt gói bảo hiểm chuyến đi trong suốt thời gian thuê.</li>
-              <li><strong>Số tiền đã đặt cọc (Qua hệ thống):</strong> {formatCurrency(booking.depositAmount || 0)}</li>
-              <li><strong>Số tiền cần thanh toán khi nhận xe:</strong> <span className="text-red-600 font-bold underline">{formatCurrency(booking.totalPrice - (booking.depositAmount || 0))}</span></li>
-              <li><strong>Tài sản thế chấp:</strong> Khách hàng để lại 01 Xe máy (kèm cà vẹt gốc) có giá trị trên 15 triệu đồng hoặc đặt cọc tiền mặt 15.000.000 VNĐ cho Chủ xe khi nhận xe.</li>
+            <h3 className="font-bold text-[14px] text-gray-900 mb-1">ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG & TÀI SẢN THẾ CHẤP</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li><strong>Tổng tiền thuê xe:</strong> <span className="font-bold text-blue-700">{formatCurrency(booking.totalPrice)}</span> (Bao gồm chi phí bảo hiểm chuyến đi ViVuCar).</li>
+              <li><strong>Số tiền đã đặt cọc qua nền tảng:</strong> {formatCurrency(booking.depositAmount || 0)}</li>
+              <li><strong>Tiền mặt thanh toán khi nhận xe:</strong> <span className="text-red-600 font-bold underline">{formatCurrency(booking.totalPrice - (booking.depositAmount || 0))}</span></li>
+              <li><strong>Tài sản thế chấp (Bên B giao cho Bên A giữ):</strong> 01 Xe máy kèm Giấy đăng ký xe bản gốc (đứng tên Bên B hoặc người bảo lãnh) trị giá trên 15.000.000 VNĐ <strong>HOẶC</strong> đặt cọc tiền mặt 15.000.000 VNĐ. Tài sản này sẽ được hoàn trả 100% khi Bên B thanh lý hợp đồng và không phát sinh vi phạm.</li>
             </ul>
           </section>
 
           <section>
-            <h3 className="font-bold text-base text-gray-900">ĐIỀU 3: TRÁCH NHIỆM BÊN B (NGƯỜI THUÊ)</h3>
-            <ul className="list-disc pl-5 mt-2 space-y-1 text-gray-700">
-              <li>Sử dụng xe đúng mục đích, không dùng xe để cầm cố, thế chấp hoặc vận chuyển hàng quốc cấm.</li>
-              <li>Chịu hoàn toàn trách nhiệm dân sự và hình sự trước pháp luật nếu vi phạm luật giao thông đường bộ trong thời gian thuê (bao gồm cả phạt nguội).</li>
-              <li>Thanh toán 100% chi phí sửa chữa tại gara chính hãng nếu gây ra tai nạn, trầy xước, hư hỏng xe.</li>
-              <li>Bồi thường phụ thu nếu trả xe trễ giờ (Mức phí: 100.000 VNĐ/giờ).</li>
+            <h3 className="font-bold text-[14px] text-gray-900 mb-1">ĐIỀU 3: MỤC ĐÍCH SỬ DỤNG & CÁC HÀNH VI BỊ NGHIÊM CẤM</h3>
+            <ul className="list-disc pl-5 space-y-1 text-gray-800">
+              <li>Bên B chỉ sử dụng xe cho mục đích di chuyển cá nhân/gia đình. <strong className="text-red-600 text-[12px]">NGHIÊM CẤM DÙNG XE ĐỂ: Cầm cố, thế chấp, bán, cho thuê lại, chạy xe ghép, tập lái, đua xe trái phép.</strong></li>
+              <li>Tuyệt đối <strong>không sử dụng xe để vận chuyển vũ khí, ma túy, hàng lậu, hàng quốc cấm</strong>. Nếu vi phạm, Bên B chịu hoàn toàn trách nhiệm Hình sự trước pháp luật, Bên A miễn trừ mọi trách nhiệm liên đ đới.</li>
+              <li>Bên A có quyền đơn phương chấm dứt hợp đồng, thu hồi xe ngay lập tức và trình báo Cơ quan Công an nếu phát hiện Bên B có dấu hiệu vi phạm các điều cấm trên (thông qua định vị GPS).</li>
             </ul>
+          </section>
+
+          <section>
+            <h3 className="font-bold text-[14px] text-gray-900 mb-1">ĐIỀU 4: TRÁCH NHIỆM KHI XẢY RA SỰ CỐ, TAI NẠN, PHẠT NGUỘI</h3>
+            <ul className="list-disc pl-5 space-y-1 text-gray-800">
+              <li><strong>Phạt giao thông:</strong> Bên B chịu trách nhiệm thanh toán 100% các khoản phạt vi phạm giao thông (phạt nóng, phạt nguội) phát sinh trong khoảng thời gian thuê xe (Dựa trên hình ảnh/biên bản của CSGT).</li>
+              <li><strong>Hư hỏng & Tai nạn:</strong> Nếu xe xảy ra va quẹt, tai nạn, Bên B phải giữ nguyên hiện trường, thông báo ngay cho Bên A và Nền tảng ViVuCar để gọi Bảo hiểm. 
+                <br/> - Bên B có trách nhiệm thanh toán chi phí sửa chữa theo báo giá của Gara chính hãng.
+                <br/> - Trong thời gian xe nằm Gara sửa chữa, Bên B phải <strong>bồi thường thiệt hại ngày nghỉ xe cho Bên A</strong> tính theo đơn giá thuê xe của hợp đồng này nhân với số ngày xe nằm xưởng.</li>
+              <li><strong>Trả xe trễ hạn:</strong> Nếu trả xe quá thời gian quy định tại Điều 1 mà không báo trước, Bên B chịu phí phạt 100.000 VNĐ/giờ. Quá 12 tiếng không liên lạc được, Bên A có quyền trình báo Công an tội Lạm dụng tín nhiệm chiếm đoạt tài sản.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="font-bold text-[14px] text-gray-900 mb-1">ĐIỀU 5: CAM KẾT CHUNG</h3>
+            <p className="pl-5">Hai bên cam kết thực hiện đúng các điều khoản đã thỏa thuận. Mọi tranh chấp phát sinh sẽ được giải quyết qua thương lượng. Nếu không tự giải quyết được sẽ đưa ra Tòa án nhân dân có thẩm quyền tại địa phương. Hợp đồng này được lập thành 02 bản có giá trị pháp lý như nhau, mỗi bên giữ 01 bản.</p>
           </section>
         </div>
 
         {/* CHỮ KÝ */}
-        <div className="grid grid-cols-2 text-center mt-12 pt-8 border-t border-gray-200">
+        <div className="grid grid-cols-2 text-center mt-10 pt-6 border-t border-gray-200">
           <div className="relative">
-            <h3 className="font-bold text-base uppercase">ĐẠI DIỆN BÊN A</h3>
-            <p className="italic text-xs text-gray-400 mb-20">(Ký và ghi rõ họ tên)</p>
+            <h3 className="font-bold text-[15px] uppercase">ĐẠI DIỆN BÊN A (CHỦ XE)</h3>
+            <p className="italic text-[11px] text-gray-400 mb-20">(Ký, điểm chỉ và ghi rõ họ tên)</p>
             
             {/* CON DẤU VIVUCAR */}
-            <div className="absolute top-12 left-1/2 -translate-x-1/2 opacity-30 pointer-events-none hidden md:flex">
-              <div className="w-24 h-24 border-[3px] border-red-500 rounded-full flex items-center justify-center rotate-[-15deg]">
-                <span className="text-red-500 font-black uppercase text-[10px] text-center leading-tight">ĐÃ DUYỆT BỞI<br/>VIVUCAR</span>
+            <div className="absolute top-10 left-1/2 -translate-x-1/2 opacity-20 pointer-events-none hidden md:flex">
+              <div className="w-20 h-20 border-[3px] border-red-500 rounded-full flex items-center justify-center rotate-[-15deg]">
+                <span className="text-red-500 font-black uppercase text-[9px] text-center leading-tight">ĐÃ DUYỆT BỞI<br/>VIVUCAR</span>
               </div>
             </div>
 
@@ -171,8 +177,8 @@ export default async function ContractPage({ params }: { params: Promise<{ booki
           </div>
 
           <div>
-            <h3 className="font-bold text-base uppercase">ĐẠI DIỆN BÊN B</h3>
-            <p className="italic text-xs text-gray-400 mb-20">(Ký và ghi rõ họ tên)</p>
+            <h3 className="font-bold text-[15px] uppercase">ĐẠI DIỆN BÊN B (NGƯỜI THUÊ)</h3>
+            <p className="italic text-[11px] text-gray-400 mb-20">(Ký, điểm chỉ và ghi rõ họ tên)</p>
             <p className="font-black uppercase">{renterName}</p>
           </div>
         </div>

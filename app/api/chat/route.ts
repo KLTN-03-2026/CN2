@@ -8,71 +8,133 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    const userMessage = messages[messages.length - 1].content;
-    const msg = userMessage.toLowerCase();
-
-    // =====================================================================
-    // 1. XÂY DỰNG BỘ LỌC TÌM KIẾM TOÀN DIỆN (PHỦ SÓNG 100% SCHEMA)
-    // =====================================================================
     let buildWhere: any = { status: "APPROVED" }; 
     let orderByConfig: any = { createdAt: "desc" }; 
 
-    // MAPPING ĐỊA ĐIỂM (12 Location)
+    const userMessages = messages.filter((m: any) => m.role === "user");
+
     const locations: Record<string, string> = {
-      "hà nội": "HaNoi", "ha noi": "HaNoi", "hcm": "TPHCM", "hồ chí minh": "TPHCM", "sài gòn": "TPHCM",
-      "đà nẵng": "DaNang", "da nang": "DaNang", "nha trang": "NhaTrang", "phú quốc": "PhuQuoc", "phu quoc": "PhuQuoc",
-      "đà lạt": "DaLat", "da lat": "DaLat", "hạ long": "HaLong", "ha long": "HaLong", "vũng tàu": "VungTau", "vung tau": "VungTau",
-      "cần thơ": "CanTho", "can tho": "CanTho", "hội an": "HoiAn", "hoi an": "HoiAn", "huế": "Hue", "hue": "Hue", "quy nhơn": "QuyNhon"
+      "hà nội": "HaNoi", "ha noi": "HaNoi", 
+      "hcm": "TPHCM", "hồ chí minh": "TPHCM", "sài gòn": "TPHCM", 
+      "đà nẵng": "DaNang", "da nang": "DaNang",
+      "nha trang": "NhaTrang", "phú quốc": "PhuQuoc", 
+      "đà lạt": "DaLat", "da lat": "DaLat",
+      "hạ long": "HaLong", "ha long": "HaLong", "vũng tàu": "VungTau",
+      "cần thơ": "CanTho", "hội an": "HoiAn", "huế": "Hue", "quy nhơn": "QuyNhon"
     };
-    for (const [key, val] of Object.entries(locations)) {
-      if (msg.includes(key)) buildWhere.location = val;
-    }
 
-    // MAPPING HÃNG XE (24 Brand)
-    const brands = [
-      "toyota", "vinfast", "hyundai", "ford", "mitsubishi", "kia", "mazda", "honda", "suzuki", 
-      "mg", "peugeot", "mercedes", "bmw", "audi", "lexus", "porsche", "nissan", "subaru", 
-      "volvo", "volkswagen", "chevrolet", "byd"
-    ];
-    for (const brand of brands) {
-      if (msg.includes(brand)) {
-        // Viết hoa chữ cái đầu cho khớp Enum (VD: toyota -> Toyota)
-        buildWhere.brand = brand.charAt(0).toUpperCase() + brand.slice(1);
-      }
-    }
-    if (msg.includes("land rover")) buildWhere.brand = "LandRover";
+    const brands: Record<string, string> = {
+      "toyota": "Toyota", "vinfast": "Vinfast", "vin": "Vinfast", 
+      "hyundai": "Hyundai", "ford": "Ford", "mitsubishi": "Mitsubishi", "mitsu": "Mitsubishi",
+      "kia": "Kia", "mazda": "Mazda", "honda": "Honda", "suzuki": "Suzuki", 
+      "mercedes": "Mercedes", "mẹc": "Mercedes", "bmw": "BMW", "bim": "BMW",
+      "audi": "Audi", "porsche": "Porsche", "lexus": "Lexus", "peugeot": "Peugeot",
+      "land rover": "LandRover", "chevrolet": "Chevrolet", "nissan": "Nissan"
+    };
 
-    // MAPPING DÁNG XE (Category)
     const categories: Record<string, string> = {
       "sedan": "Sedan", "suv": "SUV", "hatchback": "Hatchback", "mpv": "MPV",
-      "bán tải": "Pickup", "ban tai": "Pickup", "thể thao": "Sport", "the thao": "Sport"
+      "bán tải": "Pickup", "ban tai": "Pickup", "pickup": "Pickup", 
+      "thể thao": "Sport", "the thao": "Sport"
     };
-    for (const [key, val] of Object.entries(categories)) {
-      if (msg.includes(key)) buildWhere.category = val;
-    }
 
-    // MAPPING CHỖ NGỒI, HỘP SỐ, NHIÊN LIỆU
-    if (msg.match(/[457]\s*chỗ?/)) {
-      const seatsMatch = msg.match(/([457])\s*chỗ?/);
-      if (seatsMatch) buildWhere.seats = parseInt(seatsMatch[1]);
-    }
-    if (msg.includes("số tự động") || msg.includes("tu dong")) buildWhere.transmission = "Automatic";
-    else if (msg.includes("số sàn") || msg.includes("so san")) buildWhere.transmission = "Manual";
-    
-    if (msg.includes("xe điện") || msg.includes("xe dien")) buildWhere.fuel = "Electric";
-    else if (msg.includes("xe xăng") || msg.includes("xe xang")) buildWhere.fuel = "Gasoline";
-    else if (msg.includes("máy dầu") || msg.includes("xe dầu")) buildWhere.fuel = "Diesel";
+    // QUÉT TỪNG CÂU NÓI ĐỂ LẤY NGỮ CẢNH
+    userMessages.forEach((msg: any) => {
+      const rawText = msg.content.toLowerCase();
+      const paddedText = ` ${rawText.replace(/[.,!?]/g, ' ')} `;
 
-    if (msg.includes("rẻ") || msg.includes("thấp nhất")) orderByConfig = { priceOriginal: "asc" };
+      // 1. Quét Địa điểm
+      for (const [key, val] of Object.entries(locations)) {
+        if (rawText.includes(key)) buildWhere.location = val;
+      }
+      if (paddedText.includes(" hn ")) buildWhere.location = "HaNoi";
+      if (paddedText.includes(" sg ")) buildWhere.location = "TPHCM";
+      if (paddedText.includes(" vt ")) buildWhere.location = "VungTau";
+
+      // 2. Quét Hãng và Dáng xe
+      for (const [key, val] of Object.entries(brands)) {
+        if (rawText.includes(key)) buildWhere.brand = val;
+      }
+      for (const [key, val] of Object.entries(categories)) {
+        if (rawText.includes(key)) buildWhere.category = val;
+      }
+
+      // 3. Quét tiếng lóng dáng xe
+      if (rawText.includes("gầm cao") || rawText.includes("đi phượt")) buildWhere.category = { in: ["SUV", "Pickup"] };
+      else if (rawText.includes("nhỏ gọn") || rawText.includes("đi phố")) buildWhere.category = { in: ["Hatchback", "Sedan"] };
+      else if (rawText.includes("gia đình") || rawText.includes("chở nhiều đồ")) buildWhere.category = { in: ["MPV", "SUV"] };
+      else if (rawText.includes("sang trọng") || rawText.includes("xe cưới")) buildWhere.tier = "Luxury";
+
+      // ==========================================================
+      // 🚀 4. QUÉT NHIÊN LIỆU & HỘP SỐ (BẮT CÂU PHỦ ĐỊNH THÔNG MINH)
+      // ==========================================================
+      const isNotEV = rawText.match(/không\s*(thích|muốn|cần|lấy|thuê|chạy|đi|chọn|khoái).*(xe điện|ev)/);
+      if (isNotEV) {
+        buildWhere.fuel = { not: "Electric" }; // Ép DB loại bỏ hoàn toàn xe điện
+      } else if (rawText.includes("xe điện") || rawText.includes("ev")) {
+        buildWhere.fuel = "Electric";
+      } else if (rawText.includes("xe xăng")) {
+        buildWhere.fuel = "Gasoline";
+      } else if (rawText.includes("máy dầu") || rawText.includes("xe dầu")) {
+        buildWhere.fuel = "Diesel";
+      }
+
+      const isNotMT = rawText.match(/không\s*(thích|muốn|cần|lấy|thuê|chạy|đi|chọn|khoái).*(số sàn|mt)/);
+      if (isNotMT) {
+        buildWhere.transmission = "Automatic"; // Ghét số sàn thì mặc định đẩy qua số tự động
+      } else if (rawText.includes("số tự động") || rawText.includes("at")) {
+        buildWhere.transmission = "Automatic";
+      } else if (rawText.includes("số sàn") || rawText.includes("mt")) {
+        buildWhere.transmission = "Manual";
+      }
+      
+      if (rawText.includes("cũng được") || rawText.includes("bỏ qua") || rawText.includes("sao cũng được")) {
+        delete buildWhere.fuel; 
+        delete buildWhere.transmission;
+      }
+
+      // ==========================================================
+      // 5. QUÉT SỐ NGƯỜI / CHỖ NGỒI
+      // ==========================================================
+      const peopleMatch = rawText.match(/(\d+)\s*(người|chỗ|mạng|thành viên|anh em|ae)/);
+      if (peopleMatch) {
+        const num = parseInt(peopleMatch[1]);
+        if (num <= 2) delete buildWhere.seats; 
+        else if (num > 2 && num <= 5) buildWhere.seats = 5; 
+        else if (num > 5 && num <= 7) buildWhere.seats = 7; 
+        else buildWhere.seats = 16;
+      }
+
+      // 6. Quét ưu tiên giá
+      if (rawText.includes("rẻ") || rawText.includes("tiết kiệm")) orderByConfig = { priceOriginal: "asc" };
+      else if (rawText.includes("xịn nhất") || rawText.includes("sang nhất")) orderByConfig = { priceOriginal: "desc" };
+    });
 
     // =====================================================================
-    // 2. KÉO TOÀN BỘ CHI TIẾT DỮ LIỆU TỪ DATABASE
+    // 🚀 TẠO CHUỖI NHẬN DIỆN CHO BOT HIỂU ĐANG LỌC GÌ
+    // =====================================================================
+    const activeFilters = [];
+    if (buildWhere.location) activeFilters.push(`Khu vực: ${buildWhere.location}`);
+    if (buildWhere.seats) activeFilters.push(`Số chỗ: ${buildWhere.seats}`);
+    
+    // Đọc filter phủ định cho Bot hiểu
+    if (buildWhere.fuel) {
+      if (buildWhere.fuel.not) activeFilters.push(`Động cơ: TUYỆT ĐỐI KHÔNG DÙNG ${buildWhere.fuel.not}`);
+      else activeFilters.push(`Động cơ: ${buildWhere.fuel}`);
+    }
+    
+    if (buildWhere.transmission) activeFilters.push(`Hộp số: ${buildWhere.transmission}`);
+    if (buildWhere.brand) activeFilters.push(`Hãng: ${buildWhere.brand}`);
+    
+    const botUnderstoodFilters = activeFilters.length > 0 ? activeFilters.join(", ") : "Chưa có điều kiện lọc cụ thể";
+
+    // =====================================================================
+    // KÉO DỮ LIỆU TỪ DATABASE
     // =====================================================================
     const availableCars = await prisma.car.findMany({
       where: buildWhere,
-      take: 10,
+      take: 30, 
       orderBy: orderByConfig,
-      // Lấy KHÔNG SÓT MỘT THÔNG TIN NÀO
       select: { 
         name: true, brand: true, category: true, seats: true, location: true, 
         priceOriginal: true, priceDiscount: true, transmission: true, fuel: true,
@@ -80,50 +142,38 @@ export async function POST(req: Request) {
       }
     });
 
-    // Ép kiểu toàn bộ dữ liệu thành 1 khối văn bản chi tiết
     const carListData = availableCars.map((c: any) => {
       const trans = c.transmission === "Automatic" ? "Số tự động" : "Số sàn";
       const fuel = c.fuel === "Electric" ? "Điện" : c.fuel === "Gasoline" ? "Xăng" : "Dầu";
+      const currentPrice = c.priceDiscount > 0 ? c.priceDiscount : c.priceOriginal;
       
       return `📌 [${c.brand} ${c.name} - ${c.category}]
 - Thông số: ${c.seats} chỗ, ${trans}, Máy ${fuel}.
 - Vị trí: ${c.location}.
-- Giá: ${c.priceDiscount > 0 ? c.priceDiscount.toLocaleString('vi-VN') : c.priceOriginal.toLocaleString('vi-VN')}đ/ngày.
-- Phí giao xe: ${c.deliveryFee > 0 ? c.deliveryFee.toLocaleString('vi-VN') + 'đ' : 'Miễn phí'}.
-- Tiện ích có sẵn: ${c.amenities.length > 0 ? c.amenities.join(", ") : 'Cơ bản'}.
-- Yêu cầu bắt buộc: ${c.requirements ? c.requirements : 'Không có'}.
-- Quy định chủ xe: ${c.rules ? c.rules : 'Không có'}.`;
+- Giá thuê: ${currentPrice} VNĐ/ngày.
+- Phí giao xe: ${c.deliveryFee > 0 ? c.deliveryFee + ' VNĐ' : 'Miễn phí'}.
+- Tiện ích: ${c.amenities.length > 0 ? c.amenities.join(", ") : 'Cơ bản'}.`;
     }).join("\n\n");
 
     // =====================================================================
-    // 3. NẠP CẨM NANG NGHIỆP VỤ & DỮ LIỆU VÀO AI
+    // NẠP CẨM NANG VÀ ÉP BOT PHẢI TƯ VẤN SÂU SÁT
     // =====================================================================
     const systemPrompt = `
-      Bạn là chuyên viên CSKH ảo của hệ thống thuê xe tự lái ViVuCar (AutoHub AI). Luôn xưng "em" và gọi khách là "anh/chị". 
+      Bạn là chuyên viên CSKH ảo xuất sắc của hệ thống thuê xe ViVuCar (AutoHub AI). Luôn xưng "em" và gọi khách là "anh/chị".
 
-      DƯỚI ĐÂY LÀ DANH SÁCH CHI TIẾT CÁC XE PHÙ HỢP NHẤT ĐANG SẴN SÀNG:
-      ${carListData ? carListData : "(Hiện tại không có xe khớp với yêu cầu tìm kiếm của anh/chị)"}
+      HỆ THỐNG ĐÃ LỌC VÀ HIỂU NHU CẦU HIỆN TẠI CỦA KHÁCH LÀ: 
+      [ ${botUnderstoodFilters} ]
 
-      --- CẨM NANG NGHIỆP VỤ VIVUCAR ---
+      DANH SÁCH CÁC XE KHỚP VỚI YÊU CẦU TRÊN ĐANG CÓ TRONG HỆ THỐNG:
+      ${carListData ? carListData : "TRỐNG"}
 
-      1. QUY TRÌNH ĐẶT XE:
-      - Khách chọn xe và lịch trình -> Xác nhận hợp đồng -> Thanh toán cọc 30% qua web.
-      - 70% còn lại khách trả tiền mặt cho chủ xe lúc nhận xe.
-
-      2. CHÍNH SÁCH HỦY ĐƠN:
-      - Vào Lịch sử chuyến đi -> Chi tiết đơn hàng -> Bấm "Yêu cầu hủy chuyến đi".
-      - Chỉ hỗ trợ hủy khi đơn ở trạng thái "Chờ thanh toán cọc" hoặc "Đã xác nhận".
-
-      3. LỊCH TRỐNG CỦA XE:
-      - Hướng dẫn khách bấm vào Xem chi tiết xe -> Lướt xuống phần Chọn ngày. Nếu ngày đó mờ đi nghĩa là xe đang bận.
-
-      QUY TẮC TRẢ LỜI:
-      - Nắm rõ YÊU CẦU và QUY ĐỊNH của từng xe để tư vấn (Ví dụ: khách hỏi xe này có cần thế chấp sổ hộ khẩu không, phải đọc trong mục "Yêu cầu bắt buộc").
-      - Nếu khách hỏi tiện ích (có camera hành trình không?), xem mục "Tiện ích có sẵn".
-      - Không cần liệt kê toàn bộ thông tin của xe nếu khách không hỏi. Chỉ nhấn mạnh những ý khách quan tâm.
+      --- BÍ QUYẾT TƯ VẤN (BẮT BUỘC TUÂN THỦ 100%) ---
+      1. NẾU DANH SÁCH "TRỐNG": 
+         Bạn BẮT BUỘC phải báo hết xe dựa trên bộ lọc đã nhận diện. KHÔNG TỰ BỊA RA XE KHÁC NẰM NGOÀI DANH SÁCH.
+      2. THẤU HIỂU KHÁCH HÀNG ĐỔI Ý: Nếu khách nói không thích một loại xe nào đó (ví dụ không thích xe điện), hãy nói: "Dạ vâng, em đã loại bỏ xe điện ra khỏi danh sách. Đây là các mẫu xe chạy xăng/dầu cực kỳ phù hợp cho nhà mình ạ...".
+      3. ĐỐI CHIẾU NGÂN SÁCH: Nếu khách có yêu cầu khoảng giá (VD: 1-2 triệu), tự động nhìn "Giá thuê" để loại bỏ xe đắt tiền.
     `;
-
-    // 4. Xử lý lịch sử & Gọi Groq AI
+    
     const recentMessages = messages.slice(-6).map((msg: any) => ({
       role: msg.role === "user" ? "user" : "assistant",
       content: msg.content
@@ -135,7 +185,7 @@ export async function POST(req: Request) {
         ...recentMessages
       ],
       model: "llama-3.3-70b-versatile",
-      temperature: 0.6, 
+      temperature: 0.35, 
       max_tokens: 1024,
     });
 

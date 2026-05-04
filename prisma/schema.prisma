@@ -18,9 +18,9 @@ model User {
   updatedAt DateTime   @default(now()) @updatedAt
   
   bookings  Booking[]
-  wallet    Wallet?    // 🚀 MỚI: Liên kết User với Ví của họ (Nếu họ là PARTNER)
+  wallet    Wallet?    //  Liên kết User với Ví của họ (Nếu họ là PARTNER)
   cars      Car[]
-  reviews   Review[]   // 🚀 THÊM MỚI: Danh sách các đánh giá khách hàng đã viết
+  reviews   Review[]   //  Danh sách các đánh giá khách hàng đã viết
 }
 
 model Car {
@@ -66,8 +66,10 @@ model Car {
   registrationPaper     String?   @db.Text
   inspectionCertificate String?   @db.Text
   insurancePaper        String?   @db.Text
-  
+  depositReceipt        String?  @db.Text
   reviews       Review[]     // Các đánh giá dành cho xe này
+  isDepositPaid   Boolean   @default(false) // Trạng thái Admin đã nhận 2 triệu ký quỹ chưa
+  contractAgreed  Boolean   @default(false) // Đối tác đã tick đồng ý hợp đồng điện tử chưa
 }
 
 model Booking {
@@ -93,12 +95,14 @@ model Booking {
   user            User          @relation(fields: [userId], references: [id])
   car             Car           @relation(fields: [carId], references: [id])
   
-  transactions    Transaction[] // 🚀 MỚI: Liên kết với giao dịch để đối soát
+  transactions    Transaction[] // Liên kết với giao dịch để đối soát
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @default(now()) @updatedAt
 
-  review          Review?       // 🚀 THÊM MỚI: 1 cuốc xe chỉ có tối đa 1 đánh giá
+  review          Review?       // 1 cuốc xe chỉ có tối đa 1 đánh giá
+  issueReport     String?   // Lưu lý do khách hàng báo cáo (VD: "Không liên lạc được chủ xe")
+  issueReportedAt DateTime? // Thời gian khách ấn nút báo cáo
 }
 
 model Promotion {
@@ -115,7 +119,7 @@ model Promotion {
 }
 
 // ==========================================
-// BẢNG MỚI CHO CHỨC NĂNG HỢP TÁC CHỦ XE
+//  CHỨC NĂNG HỢP TÁC CHỦ XE
 // ==========================================
 
 model BlockedDate {
@@ -134,7 +138,7 @@ model Wallet {
   ownerName     String        
   ownerPhone    String        @unique 
   
-  // 🚀 THÊM MỚI: Thông tin định danh và thanh toán
+  // Thông tin định danh và thanh toán
   cccd          String?       @unique
   bankName      String?       // VD: Vietcombank
   bankAccount   String?       // VD: 1012345678
@@ -154,20 +158,20 @@ model Transaction {
   id          Int      @id @default(autoincrement())
   amount      Float    
   type        TxType   
-  status      TxStatus @default(COMPLETED) // 🚀 THÊM MỚI: Quản lý trạng thái rút tiền
+  status      TxStatus @default(COMPLETED) //  Quản lý trạng thái rút tiền
   description String?  
   
   walletId    Int
   wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
   
-  bookingId   Int?     // 🚀 THÊM MỚI: Nối với Booking để biết tiền này từ cuốc nào
+  bookingId   Int?     //  Nối với Booking để biết tiền này từ cuốc nào
   booking     Booking? @relation(fields: [bookingId], references: [id])
 
   createdAt   DateTime @default(now())
 }
 
 // ==========================================
-// 🚀 THÊM MỚI: BẢNG LƯU TRỮ ĐÁNH GIÁ (REVIEWS)
+//  BẢNG LƯU TRỮ ĐÁNH GIÁ (REVIEWS)
 // ==========================================
 model Review {
   id        Int      @id @default(autoincrement())
@@ -201,7 +205,7 @@ model ContactMessage {
 
 enum UserRole {
   USER
-  PARTNER  // 🚀 THÊM MỚI: Phân quyền cho đối tác
+  PARTNER  //  Phân quyền cho đối tác
   ADMIN
 }
 
@@ -306,6 +310,7 @@ enum BookingStatus {
   RETURNED    @map("Đã trả xe")    
   COMPLETED   @map("Hoàn thành")
   CANCELLED   @map("Đã hủy")
+  DISPUTED
 }
 
 enum PaymentStatus {
@@ -313,6 +318,7 @@ enum PaymentStatus {
   DEPOSITED
   PAID_FULL
   CANCELLED
+  REFUNDED
 }
 
 enum PaymentMethod {

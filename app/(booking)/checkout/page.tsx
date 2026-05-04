@@ -7,7 +7,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react"; 
 import { 
   User, ChevronLeft, Calendar, 
-  CreditCard, MapPin, Loader2, ArrowRight, Truck 
+  CreditCard, MapPin, Loader2, ArrowRight, Truck, AlertTriangle 
 } from "lucide-react";
 
 const formatCurrency = (amount) => {
@@ -25,10 +25,8 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
   
-  // 🚀 Lưu thông tin mã đã apply từ URL
   const [appliedPromo, setAppliedPromo] = useState(null);
 
-  // Lấy các tham số từ URL
   const carId = searchParams.get("carId");
   const startDate = searchParams.get("start");
   const endDate = searchParams.get("end");
@@ -70,9 +68,7 @@ export default function CheckoutPage() {
     }
   }, [carId, router, status, session, searchParams]);
 
-  // 🚀 ĐÃ SỬA LỖI: Tự động Validate lại mã và BẮT BUỘC gửi kèm ngày tháng
   useEffect(() => {
-    // Chỉ chạy validate nếu có đủ Mã + Ngày nhận + Ngày trả
     if (promoFromUrl && startDate && endDate) {
       const validatePromo = async () => {
         try {
@@ -81,8 +77,8 @@ export default function CheckoutPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
               code: promoFromUrl,
-              startDate: startDate, // Đã thêm ngày nhận
-              endDate: endDate      // Đã thêm ngày trả
+              startDate: startDate,
+              endDate: endDate      
             })
           });
           
@@ -91,7 +87,6 @@ export default function CheckoutPage() {
           if (res.ok) {
             setAppliedPromo(data);
           } else {
-            // Nếu Backend chặn lại (Lỗi logic như chưa đủ 3 ngày, chưa đủ 7 ngày...)
             alert(`Lỗi áp dụng mã ưu đãi: ${data.error}`);
             setAppliedPromo(null);
           }
@@ -101,7 +96,7 @@ export default function CheckoutPage() {
       };
       validatePromo();
     }
-  }, [promoFromUrl, startDate, endDate]); // Thêm dependencies để React theo dõi
+  }, [promoFromUrl, startDate, endDate]);
 
   const billing = useMemo(() => {
     if (!car || !startDate || !endDate) return { days: 0, rentalFee: 0, serviceFee: 120000, deliveryFee: 0, discount: 0, total: 0 };
@@ -134,8 +129,17 @@ export default function CheckoutPage() {
     if (!session?.user?.id) return alert("Phiên đăng nhập hết hạn, vui lòng đăng nhập lại!");
     if (!formData.name || !formData.phone) return alert("Vui lòng nhập tên và số điện thoại!");
     
-    if (isDeliveryFromUrl && !formData.deliveryAddress.trim()) {
-      return alert("Vui lòng nhập địa chỉ giao xe chi tiết!");
+    // 🚀 LỚP BẢO VỆ NGHIỆP VỤ GIAO XE
+    if (isDeliveryFromUrl) {
+      if (!formData.deliveryAddress.trim()) {
+        return alert(`Vui lòng nhập địa chỉ giao xe chi tiết tại khu vực ${car?.location}!`);
+      }
+      
+      // Bắt khách hàng xác nhận lại một lần nữa trước khi gửi đơn
+      const isConfirmed = window.confirm(
+        `XÁC NHẬN GIAO XE:\n\nXe này chỉ hỗ trợ giao trong nội thành ${car?.location}.\nPhí ${formatCurrency(billing.deliveryFee)} áp dụng cho bán kính 10km.\n\nNếu địa chỉ của bạn xa hơn hoặc khác tỉnh, chủ xe có quyền từ chối hoặc thỏa thuận phụ thu.\n\nBạn có chắc chắn muốn tiếp tục đặt xe?`
+      );
+      if (!isConfirmed) return;
     }
 
     setIsSubmitting(true);
@@ -243,9 +247,11 @@ export default function CheckoutPage() {
                     <span className="font-black uppercase italic text-sm text-blue-900">Giao xe tận nơi</span>
                     <span className="text-[10px] font-black text-orange-600 uppercase">Phí: {formatCurrency(billing.deliveryFee)}</span>
                   </div>
+                  
+                  {/* 🚀 FORM NHẬP ĐỊA CHỈ & LỜI CẢNH BÁO */}
                   <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-top-4">
                     <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1 italic flex items-center gap-1.5">
-                      <MapPin size={12}/> Địa chỉ giao xe chi tiết *
+                      <MapPin size={12}/> Địa chỉ giao xe (Nội thành {car.location}) *
                     </label>
                     <input 
                       type="text" 
@@ -254,6 +260,12 @@ export default function CheckoutPage() {
                       className="w-full bg-gray-50 border-2 border-gray-50 rounded-2xl p-4 font-bold text-gray-700 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner" 
                       onChange={e => setFormData({...formData, deliveryAddress: e.target.value})} 
                     />
+                    <div className="flex items-start gap-2 mt-2 p-3 bg-red-50 rounded-xl border border-red-100">
+                      <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={14}/>
+                      <p className="text-[10px] text-red-700 font-medium leading-relaxed italic">
+                        <strong className="font-black uppercase">Lưu ý quan trọng:</strong> Phí giao xe chỉ áp dụng trong bán kính 10km thuộc khu vực <strong>{car.location}</strong>. Nếu địa chỉ của bạn nằm khác Tỉnh/Thành phố hoặc xa hơn 10km, chủ xe có quyền từ chối hoặc thỏa thuận phụ thu trực tiếp.
+                      </p>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -318,7 +330,6 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                {/* Show mã giảm giá đã đọc từ URL */}
                 {billing.discount > 0 && (
                   <div className="flex justify-between text-[10px] font-black text-green-600 uppercase italic">
                     <span>Mã giảm giá ({appliedPromo?.code})</span>

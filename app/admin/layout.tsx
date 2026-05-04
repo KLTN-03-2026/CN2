@@ -9,15 +9,17 @@ import {
   Gift, BarChart3, LogOut, ShieldCheck, MessageSquare
 } from "lucide-react";
 
+// 🚀 IMPORT COMPONENT CÁI CHUÔNG THÔNG BÁO VỪA TẠO
+import AdminNotificationBell from "@/components/admin/AdminNotificationBell";
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // 1. KIỂM TRA BẢO MẬT
+  // 1. KIỂM TRA BẢO MẬT (Server Side)
   const session = await getServerSession(authOptions);
   
   if (!session || session.user?.role !== "ADMIN") {
     redirect("/"); 
   }
 
-  // 🚀 2. ĐÃ KHÔI PHỤC ĐẦY ĐỦ VÀ CHÍNH XÁC ĐƯỜNG DẪN CỦA BẠN
   const adminMenus = [
     { name: "Quản trị Đơn hàng", icon: <ClipboardList size={20} />, path: "/admin" },
     { name: "Quản trị Đội xe", icon: <CarFront size={20} />, path: "/admin/cars" },
@@ -82,14 +84,26 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </p>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <p className="text-xs font-black text-blue-900 uppercase tracking-widest">{session.user.name || "Quản trị viên"}</p>
-              <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Đang hoạt động</p>
+          <div className="flex items-center gap-6">
+            
+            {/* 🚀 GẮN COMPONENT CHUÔNG THÔNG BÁO VÀO ĐÂY */}
+            <AdminNotificationBell />
+
+            {/* ĐƯỜNG KẺ DỌC PHÂN CÁCH */}
+            <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
+
+            <div className="flex items-center gap-4">
+              <div className="text-right hidden sm:block">
+                <p className="text-xs font-black text-blue-900 uppercase tracking-widest">{session.user.name || "Quản trị viên"}</p>
+                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center justify-end gap-1">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Đang hoạt động
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-black italic shadow-inner">
+                {(session.user.name || "A")[0]}
+              </div>
             </div>
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-black italic">
-              {(session.user.name || "A")[0]}
-            </div>
+
           </div>
         </header>
 

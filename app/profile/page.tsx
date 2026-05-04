@@ -208,7 +208,7 @@ export default function ProfilePage() {
                         </p>
                         <p className="text-[10px] text-gray-600 font-bold leading-relaxed flex items-start gap-2">
                           <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1 shrink-0"></span>
-                          Nếu xảy ra va chạm hoặc sự cố, giữ nguyên hiện trường và gọi ngay Hotline <span className="text-blue-600 font-black whitespace-nowrap">1900 8888</span>.
+                          Nếu xảy ra va chạm hoặc sự cố, giữ nguyên hiện trường và gọi ngay Hotline <span className="text-blue-600 font-black whitespace-nowrap">1900 8888</span>
                         </p>
                       </div>
                     </div>

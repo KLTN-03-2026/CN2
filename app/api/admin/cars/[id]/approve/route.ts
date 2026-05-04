@@ -32,7 +32,8 @@ export async function POST(request: Request, context: { params: { id: string } }
         where: { id: carId },
         data: { 
           status: "APPROVED",
-          // Nếu bạn có cột rules để ghi chú, hãy xóa ghi chú từ chối cũ
+          isDepositPaid: true
+          
           
         },
       });

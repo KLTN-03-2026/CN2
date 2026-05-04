@@ -34,7 +34,7 @@ export const getBookingState = (booking: any) => {
       return state;
     }
 
-    // 🚀 2. ĐÃ TRẢ XE (Chờ Admin chốt)
+    // 2. ĐÃ TRẢ XE (Chờ Admin chốt)
     if (booking.status === "RETURNED") {
       state.text = "Chờ chốt doanh thu";
       state.badgeClass = "bg-teal-50 text-teal-600 border-teal-200";
@@ -42,7 +42,7 @@ export const getBookingState = (booking: any) => {
       return state;
     }
 
-    // 🚀 3. ĐANG DIỄN RA (Khách đang đi)
+    // 3. ĐANG DIỄN RA (Khách đang đi)
     if (booking.status === "IN_PROGRESS") {
       state.text = "Đang diễn ra";
       state.badgeClass = "bg-indigo-50 text-indigo-600 border-indigo-200";
@@ -50,31 +50,48 @@ export const getBookingState = (booking: any) => {
       return state;
     }
 
-    // 4. ĐÃ HỦY
-    if (booking.status === "CANCELLED") {
-      state.text = "Đã hủy";
-      state.badgeClass = "bg-red-50 text-red-700 border-red-100";
+    // 🚀 4. TRANH CHẤP (Khách hàng báo cáo sự cố khẩn cấp)
+    if (booking.status === "DISPUTED") {
+      state.text = "Tranh chấp sự cố";
+      state.badgeClass = "bg-red-600 text-white border-red-700 shadow-md shadow-red-200 animate-pulse";
+      state.cancelMessage = "Đơn hàng đang được Admin xử lý sự cố. Không thể thao tác.";
       return state;
     }
 
-    // 5. HẾT HẠN
+    // 🚀 5. ĐÃ HỦY (Kèm kiểm tra xem đã hoàn tiền chưa)
+    if (booking.status === "CANCELLED") {
+      if (booking.paymentStatus === "REFUNDED") {
+         state.text = "Đã hủy & Hoàn tiền";
+         state.badgeClass = "bg-gray-100 text-gray-500 border-gray-300";
+         state.cancelMessage = "Đơn hàng đã hủy và hệ thống đã ghi nhận hoàn tiền cọc.";
+      } else {
+         state.text = "Đã hủy";
+         state.badgeClass = "bg-red-50 text-red-700 border-red-100";
+         state.cancelMessage = "Chuyến đi đã bị hủy.";
+      }
+      return state;
+    }
+
+    // 6. HẾT HẠN
     if (isExpired && booking.paymentStatus === "PENDING") {
       state.text = "Đã hết hạn";
       state.badgeClass = "bg-gray-100 text-gray-400 border-gray-200";
+      state.cancelMessage = "Đơn hàng đã hết hạn do không thanh toán cọc đúng giờ.";
       return state;
     }
 
-    // 6. CHỜ THANH TOÁN (PENDING)
+    // 7. CHỜ THANH TOÁN (PENDING)
     if (booking.status === "PENDING") {
         state.text = "Chờ thanh toán cọc";
         state.badgeClass = "bg-orange-50 text-orange-600 border-orange-200 animate-pulse";
         state.canUserCancel = true;
         state.canUserPay = true; 
+        state.canAdminAction = true; // Admin có quyền Hủy ở trạng thái này
         state.cancelMessage = "Hủy miễn phí (Bạn đang trong thời gian giữ chỗ).";
         return state;
     }
 
-    // 7. ĐÃ XÁC NHẬN (Khách đã cọc, chờ tới ngày lấy xe)
+    // 8. ĐÃ XÁC NHẬN (Khách đã cọc, chờ tới ngày lấy xe)
     if (booking.status === "CONFIRMED") {
       state.badgeClass = "bg-blue-50 text-blue-600 border-blue-100"; 
       state.text = "Đã xác nhận";

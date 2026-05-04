@@ -94,7 +94,7 @@ export default function PartnerWalletPage() {
         setTransactions([data.transaction, ...transactions]); // Cập nhật UI ngay
         setIsWithdrawing(false);
         setWithdrawAmount("");
-        alert("Yêu cầu rút tiền thành công! Tiền sẽ về tài khoản trong 24h.");
+        alert("Yêu cầu rút tiền thành công! Admin sẽ kiểm tra và chuyển tiến về tài khoản trong 24h.");
       } else {
         alert(data.error);
       }

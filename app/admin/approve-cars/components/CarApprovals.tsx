@@ -6,7 +6,8 @@ import { useState, useEffect } from "react";
 import { 
   MapPin, User as UserIcon, Settings, Banknote, 
   Eye, ShieldAlert, Search, X, FileText, CheckCircle2, 
-  Image as ImageIcon, AlertCircle, ShieldCheck, Map, Info
+  Image as ImageIcon, AlertCircle, ShieldCheck, Map, Info,
+  AlertTriangle, BadgeCheck
 } from "lucide-react";
 
 const formatCurrency = (amount) => {
@@ -91,11 +92,22 @@ export default function CarApprovals() {
     finally { setLoading(false); }
   };
 
-  const handleApproveCar = async (carId, ownerName) => {
-    if (!window.confirm(`Xác nhận: Duyệt chiếc xe của ${ownerName || 'đối tác'} lên hệ thống?`)) return;
+  const handleApproveCar = async (carId, ownerName, isDepositPaid) => {
+    // Nếu chưa đóng tiền, hỏi Admin có chắc chắn đã nhận tiền chưa
+    const confirmMsg = isDepositPaid 
+      ? `Xác nhận: Duyệt chiếc xe của ${ownerName || 'đối tác'} lên hệ thống?`
+      : `Hệ thống ghi nhận xe này CHƯA ĐÓNG KÝ QUỸ.\nBạn xác nhận ĐÃ NHẬN ĐƯỢC 2.000.000đ từ đối tác ${ownerName} và muốn duyệt xe lên sàn?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
     setIsProcessing(true);
     try {
-      const res = await fetch(`/api/admin/cars/${carId}/approve`, { method: "POST" });
+      const res = await fetch(`/api/admin/cars/${carId}/approve`, { 
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        // 🚀 Gửi thêm lệnh update cờ ký quỹ
+        body: JSON.stringify({ isDepositPaid: true }) 
+      });
       const data = await res.json();
       if (res.ok) {
         setPendingCars(prev => prev.filter(c => c.id !== carId));
@@ -163,7 +175,19 @@ export default function CarApprovals() {
           {filteredCars.map((car) => {
             const carImages = getCarImages(car);
             return (
-              <div key={car.id} className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-xl hover:border-blue-200 transition-all">
+              <div key={car.id} className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-xl hover:border-blue-200 transition-all relative">
+                
+                {/* 🚀 TEM HIỂN THỊ TRẠNG THÁI KÝ QUỸ LÊN GÓC THẺ XE */}
+                {car.isDepositPaid ? (
+                   <div className="absolute top-4 left-4 z-10 bg-green-500 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-lg shadow-md italic flex items-center gap-1">
+                     <BadgeCheck size={12}/> Đã đóng quỹ
+                   </div>
+                ) : (
+                   <div className="absolute top-4 left-4 z-10 bg-orange-500 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-lg shadow-md italic flex items-center gap-1">
+                     <AlertTriangle size={12}/> Chờ đóng quỹ
+                   </div>
+                )}
+
                 <div className="h-48 bg-gray-100 relative overflow-hidden">
                   {carImages.length > 0 ? (
                     <img src={carImages[0]} alt={car.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -175,7 +199,7 @@ export default function CarApprovals() {
                   <div className="absolute top-4 right-4 bg-yellow-400 text-yellow-900 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg shadow-md italic">Chờ duyệt</div>
                 </div>
                 <div className="p-6 flex-1 flex flex-col">
-                  <div className="mb-4">
+                  <div className="mb-4 mt-2">
                     <h3 className="text-lg font-black text-blue-900 uppercase italic tracking-tighter truncate">{car.name}</h3>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1 mt-1">
                       <MapPin size={12}/> {car.location || "Chưa cập nhật"}
@@ -226,7 +250,22 @@ export default function CarApprovals() {
                   <h2 className="text-2xl font-black text-blue-900 uppercase italic tracking-tighter flex items-center gap-3">
                     <FileText className="text-blue-600" /> Chi tiết hồ sơ phương tiện
                   </h2>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Mã hệ thống: #{selectedCar.id}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 flex items-center gap-2">
+                    Mã hệ thống: #{selectedCar.id} 
+                    {/* 🚀 HIỂN THỊ CỜ KÝ QUỸ & HỢP ĐỒNG */}
+                    | Ký quỹ: 
+                    {selectedCar.isDepositPaid ? (
+                      <span className="text-green-500 font-black">Đã đóng</span>
+                    ) : (
+                      <span className="text-orange-500 font-black">Chưa đóng</span>
+                    )}
+                    | Hợp đồng: 
+                    {selectedCar.contractAgreed ? (
+                      <span className="text-green-500 font-black">Đã ký</span>
+                    ) : (
+                      <span className="text-gray-400">Trống</span>
+                    )}
+                  </p>
                 </div>
                 <button onClick={() => setSelectedCar(null)} className="p-2 bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-500 rounded-full transition-colors">
                   <X size={24} />
@@ -406,16 +445,23 @@ export default function CarApprovals() {
                 <button disabled={isProcessing} onClick={() => handleRejectCar(selectedCar.id, selectedCar.user?.name || selectedCar.ownerName)} className="px-6 py-3 bg-white text-red-500 border-2 border-red-100 hover:bg-red-50 hover:border-red-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all italic disabled:opacity-50">
                   {isProcessing ? "Đang xử lý..." : "Từ chối hồ sơ"}
                 </button>
-                <button disabled={isProcessing} onClick={() => handleApproveCar(selectedCar.id, selectedCar.user?.name || selectedCar.ownerName)} className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 italic disabled:opacity-50 active:scale-95">
-                  <CheckCircle2 size={16} /> Phê duyệt lên sàn
-                </button>
+                
+                {/* 🚀 NÚT DUYỆT THÔNG MINH */}
+                {selectedCar.isDepositPaid ? (
+                   <button disabled={isProcessing} onClick={() => handleApproveCar(selectedCar.id, selectedCar.user?.name || selectedCar.ownerName, true)} className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 italic disabled:opacity-50 active:scale-95">
+                     <CheckCircle2 size={16} /> Phê duyệt lên sàn
+                   </button>
+                ) : (
+                   <button disabled={isProcessing} onClick={() => handleApproveCar(selectedCar.id, selectedCar.user?.name || selectedCar.ownerName, false)} className="px-8 py-3 bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 italic disabled:opacity-50 active:scale-95">
+                     <Banknote size={16} /> Đã nhận 2.000.000đ & Duyệt
+                   </button>
+                )}
               </div>
             </div>
           </div>
         );
       })()}
 
-      {/* 🚀 MODAL XEM ẢNH FULL MÀN HÌNH (ĐÃ FIX PHÓNG TO TỐI ĐA) */}
       {fullScreenImage && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 p-4 sm:p-8" onClick={() => setFullScreenImage(null)}>
           <button className="absolute top-4 right-4 md:top-8 md:right-8 text-white bg-white/20 hover:bg-red-500 p-3 rounded-full transition-all shadow-lg z-50">

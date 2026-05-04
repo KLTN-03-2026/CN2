@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import AuthModal from "@/components/features/AuthModal"; 
 
+// 🚀 IMPORT COMPONENT CHUÔNG THÔNG BÁO DÀNH CHO USER
+import UserNotificationBell from "@/components/features/UserNotificationBell";
+
 export default function Navbar() {
   // 🚀 1. KHAI BÁO TẤT CẢ HOOKS Ở ĐẦY TIÊN (Rules of Hooks)
   const pathname = usePathname();
@@ -112,80 +115,85 @@ export default function Navbar() {
           {/* CỤM TÀI KHOẢN */}
           <div className="flex items-center gap-2">
             {status === "authenticated" && user ? (
-              <div className="relative">
-                <button 
-                  onClick={() => setShowDropdown(!showDropdown)}
-                  className="flex items-center gap-2 p-1 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-blue-50 transition-all active:scale-95"
-                >
-                  <div className="w-8 h-8 bg-blue-900 rounded-xl flex items-center justify-center text-white font-black text-xs italic shadow-md">
-                    {user.name?.charAt(0).toUpperCase() || "U"}
-                  </div>
-                  <div className="flex flex-col items-start pr-3">
-                    <span className="text-[10px] font-black text-gray-400 uppercase leading-none mb-0.5">Thành viên</span>
-                    <span className="text-xs font-black text-blue-900 uppercase italic tracking-tighter max-w-[100px] truncate">
-                      {user.name}
-                    </span>
-                  </div>
-                  <ChevronDown size={14} className={`text-blue-900 transition-transform duration-300 mr-2 ${showDropdown ? 'rotate-180' : ''}`} />
-                </button>
+              <>
+                {/* 🚀 GẮN COMPONENT CHUÔNG VÀO NGAY TRƯỚC AVATAR CỦA USER */}
+                <UserNotificationBell />
 
-                {showDropdown && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowDropdown(false)}></div>
-                    <div className="absolute right-0 mt-4 w-[280px] bg-white border border-gray-100 rounded-[24px] shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                      
-                      <div className="bg-gray-50/80 px-5 py-4 border-b border-gray-100 mb-3">
-                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Bảng điều khiển</p>
-                      </div>
-
-                      <div className="px-3 flex flex-col gap-2 mb-3">
-                        {/* 1. KHU VỰC CHO ADMIN */}
-                        {user.role === "ADMIN" && (
-                          <>
-                            <Link href="/admin" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
-                              <LayoutDashboard size={18} /> QUẢN TRỊ ĐƠN HÀNG
-                            </Link>
-                            <Link href="/admin/cars" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
-                              <CarFront size={18} /> QUẢN TRỊ ĐỘI XE
-                            </Link>
-                            <Link href="/admin/promotions" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
-                              <Gift size={18} /> QUẢN TRỊ MÃ ƯU ĐÃI
-                            </Link>
-                            <Link href="/admin/approve-cars" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
-                              <Handshake size={18} /> QUẢN LÝ HỢP TÁC
-                            </Link>
-                            <Link href="/admin/reports" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
-                              <BarChart3 size={18} /> THỐNG KÊ VÀ DOANH THU
-                            </Link>
-                            <Link href="/admin/contacts" className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
-  <MessageSquare size={18} /> YÊU CẦU HỖ TRỢ
-</Link>
-                          </>
-                        )}
-
-                        {/* 2. MENU ĐỐI TÁC CHỦ XE */}
-                        <Link href="/partner/dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
-                           <LayoutDashboard size={18} /> QUẢN LÝ XE CHO THUÊ
-                        </Link>
-                        
-                        {/* 3. KHU VỰC CHUNG CHO USER */}
-                        <Link href="/profile" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all rounded-xl border border-gray-100 uppercase italic">
-                          <CalendarDays size={18} /> Chuyến đi của tôi
-                        </Link>
-                        <Link href="/profile/info" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all rounded-xl border border-gray-100 uppercase italic">
-                          <User size={18} /> Thông tin cá nhân
-                        </Link>
-                        
-                      </div>
-
-                      <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-4 text-[10px] font-black text-red-500 bg-red-50/50 hover:bg-red-500 hover:text-white transition-all uppercase italic tracking-widest border-t border-red-50">
-                        <LogOut size={16} /> Thoát hệ thống
-                      </button>
-
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    className="flex items-center gap-2 p-1 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-blue-50 transition-all active:scale-95"
+                  >
+                    <div className="w-8 h-8 bg-blue-900 rounded-xl flex items-center justify-center text-white font-black text-xs italic shadow-md">
+                      {user.name?.charAt(0).toUpperCase() || "U"}
                     </div>
-                  </>
-                )}
-              </div>
+                    <div className="flex flex-col items-start pr-3">
+                      <span className="text-[10px] font-black text-gray-400 uppercase leading-none mb-0.5">Thành viên</span>
+                      <span className="text-xs font-black text-blue-900 uppercase italic tracking-tighter max-w-[100px] truncate">
+                        {user.name}
+                      </span>
+                    </div>
+                    <ChevronDown size={14} className={`text-blue-900 transition-transform duration-300 mr-2 ${showDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowDropdown(false)}></div>
+                      <div className="absolute right-0 mt-4 w-[280px] bg-white border border-gray-100 rounded-[24px] shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        
+                        <div className="bg-gray-50/80 px-5 py-4 border-b border-gray-100 mb-3">
+                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Bảng điều khiển</p>
+                        </div>
+
+                        <div className="px-3 flex flex-col gap-2 mb-3">
+                          {/* 1. KHU VỰC CHO ADMIN */}
+                          {user.role === "ADMIN" && (
+                            <>
+                              <Link href="/admin" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
+                                <LayoutDashboard size={18} /> QUẢN TRỊ ĐƠN HÀNG
+                              </Link>
+                              <Link href="/admin/cars" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
+                                <CarFront size={18} /> QUẢN TRỊ ĐỘI XE
+                              </Link>
+                              <Link href="/admin/promotions" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
+                                <Gift size={18} /> QUẢN TRỊ MÃ ƯU ĐÃI
+                              </Link>
+                              <Link href="/admin/approve-cars" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
+                                <Handshake size={18} /> QUẢN LÝ HỢP TÁC
+                              </Link>
+                              <Link href="/admin/reports" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
+                                <BarChart3 size={18} /> THỐNG KÊ VÀ DOANH THU
+                              </Link>
+                              <Link href="/admin/contacts" className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
+                                <MessageSquare size={18} /> YÊU CẦU HỖ TRỢ
+                              </Link>
+                            </>
+                          )}
+
+                          {/* 2. MENU ĐỐI TÁC CHỦ XE */}
+                          <Link href="/partner/dashboard" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all rounded-xl border border-blue-100 uppercase italic">
+                             <LayoutDashboard size={18} /> QUẢN LÝ XE CHO THUÊ
+                          </Link>
+                          
+                          {/* 3. KHU VỰC CHUNG CHO USER */}
+                          <Link href="/profile" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all rounded-xl border border-gray-100 uppercase italic">
+                            <CalendarDays size={18} /> Chuyến đi của tôi
+                          </Link>
+                          <Link href="/profile/info" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3.5 text-[10px] font-black text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all rounded-xl border border-gray-100 uppercase italic">
+                            <User size={18} /> Thông tin cá nhân
+                          </Link>
+                          
+                        </div>
+
+                        <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-4 text-[10px] font-black text-red-500 bg-red-50/50 hover:bg-red-500 hover:text-white transition-all uppercase italic tracking-widest border-t border-red-50">
+                          <LogOut size={16} /> Thoát hệ thống
+                        </button>
+
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
             ) : (
               <div className="flex items-center gap-2">
                 <button onClick={() => openAuth('login')} className="text-xs font-black text-blue-900 uppercase italic px-5 py-2.5 transition-all hover:bg-blue-50 rounded-xl">Đăng nhập</button>

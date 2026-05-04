@@ -9,7 +9,7 @@ import {
   CheckCircle, XCircle, TrendingUp, Package, 
   ChevronRight, Calendar, Banknote, CheckSquare,
   ShieldCheck, Loader2, Car, MapPin, Phone,
-  Truck, MessageSquare 
+  Truck, MessageSquare, AlertTriangle, AlertOctagon
 } from "lucide-react";
 import { getBookingState } from "@/lib/bookingUtils"; 
 
@@ -95,8 +95,36 @@ export default function AdminPage() {
     }
   };
 
+  // 🚀 HÀM MỚI: XỬ LÝ TRANH CHẤP
+  const handleResolveDispute = async (id, actionType) => {
+    if (actionType === "REFUND") {
+      if (!confirm("CẢNH BÁO: Hành động này sẽ:\n1. Hủy đơn hàng.\n2. Đánh dấu đã hoàn tiền cọc cho khách.\n\nBạn có chắc chắn muốn thực hiện?")) return;
+    } else {
+      if (!confirm("Xác nhận: Bác bỏ khiếu nại của khách và đưa đơn hàng trở lại trạng thái Đã Cọc?")) return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/bookings/${id}/resolve-dispute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: actionType })
+      });
+      if (res.ok) {
+        alert("Đã xử lý tranh chấp thành công!");
+        fetchBookings();
+      } else {
+        const data = await res.json();
+        alert(`Lỗi: ${data.error}`);
+      }
+    } catch (error) {
+      alert("Lỗi kết nối máy chủ.");
+    }
+  };
+
+  // 🚀 Thêm tab DISPUTED vào bộ lọc
   const filterTabs = [
     { key: "ALL", label: "Tất cả" },
+    { key: "DISPUTED", label: "Tranh chấp" },
     { key: "PENDING", label: "Chờ cọc" },
     { key: "CONFIRMED", label: "Chờ giao" },
     { key: "IN_PROGRESS", label: "Đang thuê" },
@@ -109,6 +137,7 @@ export default function AdminPage() {
     total: bookings.length,
     active: bookings.filter(b => b.status === "IN_PROGRESS").length,
     payoutNeeded: bookings.filter(b => b.status === "RETURNED").length,
+    disputed: bookings.filter(b => b.status === "DISPUTED").length, // Thêm thống kê tranh chấp
     revenue: bookings.filter(b => b.status === "COMPLETED").reduce((sum, b) => sum + (b.totalPrice || 0), 0)
   };
 
@@ -142,8 +171,8 @@ export default function AdminPage() {
                 onClick={() => setFilter(tab.key)}
                 className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase italic transition-all ${
                   filter === tab.key 
-                  ? "bg-blue-600 text-white shadow-lg" 
-                  : "text-gray-400 hover:bg-gray-50 hover:text-blue-900"
+                  ? (tab.key === "DISPUTED" ? "bg-red-600 text-white shadow-lg shadow-red-200" : "bg-blue-600 text-white shadow-lg") 
+                  : (tab.key === "DISPUTED" ? "text-red-400 hover:bg-red-50 hover:text-red-700" : "text-gray-400 hover:bg-gray-50 hover:text-blue-900")
                 }`}
               >
                 {tab.label} ({bookings.filter(b => tab.key === "ALL" ? true : b.status === tab.key).length})
@@ -151,6 +180,22 @@ export default function AdminPage() {
             ))}
           </div>
         </div>
+
+        {/* CẢNH BÁO TRANH CHẤP TRÊN ĐẦU */}
+        {stats.disputed > 0 && (
+          <div className="bg-red-50 border-2 border-red-200 p-4 rounded-3xl mb-6 flex items-center justify-between animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-red-100 p-2 rounded-full text-red-600 animate-pulse">
+                <AlertOctagon size={24} />
+              </div>
+              <div>
+                <p className="font-black text-red-700 uppercase tracking-widest text-sm">Cảnh báo hệ thống</p>
+                <p className="text-xs text-red-600 font-medium mt-1">Đang có {stats.disputed} đơn hàng bị tranh chấp cần Admin vào phân xử ngay lập tức!</p>
+              </div>
+            </div>
+            <button onClick={() => setFilter("DISPUTED")} className="px-4 py-2 bg-red-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-red-700 shadow-md">Xem ngay</button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all">
@@ -196,12 +241,12 @@ export default function AdminPage() {
                   <tr><td colSpan={6} className="p-16 text-center text-gray-400 font-bold italic">Không có dữ liệu trong mục này</td></tr>
                 ) : filteredBookings.map((booking) => (
                   <tr key={booking.id} className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="p-6">
+                    <td className="p-6 align-top">
                       <p className="font-black text-blue-900 italic text-lg">#{booking.id}</p>
                       <p className="text-[8px] font-bold text-gray-400 uppercase mt-1 tracking-widest">{new Date(booking.createdAt).toLocaleDateString('vi-VN')}</p>
                     </td>
                     
-                    <td className="p-6">
+                    <td className="p-6 align-top">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-black italic text-xs shrink-0">
                           {(booking.customerName || booking.user?.name || "U").charAt(0).toUpperCase()}
@@ -217,7 +262,7 @@ export default function AdminPage() {
                       </div>
                     </td>
 
-                    <td className="p-6 min-w-[220px]">
+                    <td className="p-6 min-w-[220px] align-top">
                       <p className="font-black text-blue-600 uppercase italic text-xs tracking-tighter mb-2 line-clamp-1">{booking.car?.name}</p>
                       
                       {booking.isDelivery ? (
@@ -241,7 +286,7 @@ export default function AdminPage() {
                       )}
                     </td>
                     
-                    <td className="p-6">
+                    <td className="p-6 align-top">
                       <div className="flex items-start gap-3 text-gray-500 font-black text-[10px] uppercase italic">
                         <Calendar size={14} className="text-blue-600 mt-0.5 shrink-0" />
                         <div className="flex flex-col gap-1.5 mt-0.5">
@@ -260,75 +305,57 @@ export default function AdminPage() {
                       </div>
                     </td>
                     
-                    {/* 🚀 LOGIC HIỂN THỊ THANH TOÁN ĐÃ ĐƯỢC CHỈNH SỬA TUYỆT ĐỐI CHÍNH XÁC */}
-                    <td className="p-6">
+                    <td className="p-6 align-top">
                       {booking.status === "CANCELLED" ? (
-                        booking.paymentStatus === "PENDING" ? (
-                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 w-fit opacity-80">
-                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">
-                              Hủy trước khi cọc
+                        booking.paymentStatus === "REFUNDED" ? (
+                          // 🚀 ĐÃ HOÀN TIỀN
+                          <div className="bg-gray-100 p-3 rounded-xl border border-gray-300 w-fit">
+                            <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1 flex items-center gap-1">
+                              <CheckCircle size={10}/> Đã Hủy & Hoàn Tiền
                             </p>
                             <p className="font-black text-gray-400 text-sm italic tracking-tighter line-through">
                               Tổng: {formatCurrency(booking.totalPrice)}
                             </p>
-                            <p className="text-[9px] font-bold text-gray-500 uppercase mt-1 tracking-widest">
-                              Đã thu: 0đ
-                            </p>
+                          </div>
+                        ) : booking.paymentStatus === "PENDING" ? (
+                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 w-fit opacity-80">
+                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Hủy trước khi cọc</p>
+                            <p className="font-black text-gray-400 text-sm italic tracking-tighter line-through">Tổng: {formatCurrency(booking.totalPrice)}</p>
+                            <p className="text-[9px] font-bold text-gray-500 uppercase mt-1 tracking-widest">Đã thu: 0đ</p>
                           </div>
                         ) : (
                           <div className="bg-red-50 p-3 rounded-xl border border-red-100 w-fit">
-                            <p className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-1">
-                              Đã hủy do quá hạn cọc
-                            </p>
-                            <p className="font-black text-red-400 text-sm italic tracking-tighter line-through opacity-80">
-                              Tổng: {formatCurrency(booking.totalPrice)}
-                            </p>
-                            <p className="text-[9px] font-bold text-red-600 uppercase mt-1 tracking-widest">
-                              Chưa cọc: {formatCurrency(booking.depositAmount)}
-                            </p>
+                            <p className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-1">Đã hủy quá hạn</p>
+                            <p className="font-black text-red-400 text-sm italic tracking-tighter line-through opacity-80">Tổng: {formatCurrency(booking.totalPrice)}</p>
                           </div>
                         )
                       ) : booking.status === "PENDING" ? (
                         <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 w-fit">
-                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">
-                            Chưa thanh toán
-                          </p>
-                          <p className="font-black text-gray-400 text-sm italic tracking-tighter opacity-80">
-                            Tổng: {formatCurrency(booking.totalPrice)}
-                          </p>
-                          <p className="text-[9px] font-bold text-orange-500 uppercase mt-1 tracking-widest animate-pulse">
-                            Chờ cọc: {formatCurrency(booking.depositAmount)}
-                          </p>
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Chưa thanh toán</p>
+                          <p className="font-black text-gray-400 text-sm italic tracking-tighter opacity-80">Tổng: {formatCurrency(booking.totalPrice)}</p>
+                          <p className="text-[9px] font-bold text-orange-500 uppercase mt-1 tracking-widest animate-pulse">Chờ cọc: {formatCurrency(booking.depositAmount)}</p>
                         </div>
                       ) : booking.paymentMethod === "FULL_PAY" ? (
                         <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 w-fit">
-                          <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 flex items-center gap-1">
-                            <Banknote size={12}/> Đã trả 100%
-                          </p>
-                          <p className="font-black text-emerald-700 text-sm italic tracking-tighter">
-                            {formatCurrency(booking.totalPrice)}
-                          </p>
+                          <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 flex items-center gap-1"><Banknote size={12}/> Đã trả 100%</p>
+                          <p className="font-black text-emerald-700 text-sm italic tracking-tighter">{formatCurrency(booking.totalPrice)}</p>
                         </div>
                       ) : (
                         <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 w-fit shadow-sm">
                           <div className="mb-2">
                             <p className="text-[9px] font-black text-orange-600 uppercase tracking-widest mb-1">Đã đặt cọc</p>
-                            <p className="font-black text-orange-700 text-xs italic tracking-tighter">
-                              {booking.depositAmount > 0 ? formatCurrency(booking.depositAmount) : "---"}
-                            </p>
+                            <p className="font-black text-orange-700 text-xs italic tracking-tighter">{booking.depositAmount > 0 ? formatCurrency(booking.depositAmount) : "---"}</p>
                           </div>
                           <div className="h-px w-full bg-orange-200/60 mb-2"></div>
                           <div>
                             <p className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-1">Thu thêm khi giao</p>
-                            <p className="font-black text-red-600 text-sm italic tracking-tighter">
-                              {formatCurrency((booking.totalPrice || 0) - (booking.depositAmount || 0))}
-                            </p>
+                            <p className="font-black text-red-600 text-sm italic tracking-tighter">{formatCurrency((booking.totalPrice || 0) - (booking.depositAmount || 0))}</p>
                           </div>
                         </div>
                       )}
                     </td>
 
-                    <td className="p-6 text-center">
+                    <td className="p-6 text-center align-top">
                       {(() => {
                         const state = getBookingState(booking);
                         return (
@@ -336,6 +363,18 @@ export default function AdminPage() {
                             <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase italic border ${state.badgeClass}`}>
                               {state.text}
                             </span>
+
+                            {/* NẾU TRANH CHẤP -> HIỆN NÚT XỬ LÝ */}
+                            {booking.status === 'DISPUTED' && (
+                              <div className="mt-3 bg-red-50 p-3 rounded-xl border border-red-200 w-56 text-left shadow-sm">
+                                <p className="text-[9px] font-black text-red-600 uppercase tracking-widest flex items-center gap-1 mb-1"><AlertTriangle size={10}/> Lý do từ khách:</p>
+                                <p className="text-xs font-medium text-red-800 mb-3 line-clamp-3 bg-white p-2 rounded-lg border border-red-100">{booking.issueReport}</p>
+                                <div className="flex flex-col gap-2">
+                                  <button onClick={() => handleResolveDispute(booking.id, 'REFUND')} className="w-full bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-md transition-all">Hoàn tiền khách</button>
+                                  <button onClick={() => handleResolveDispute(booking.id, 'IGNORE')} className="w-full bg-white border border-gray-200 text-gray-600 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all">Bác bỏ (Bỏ qua)</button>
+                                </div>
+                              </div>
+                            )}
                             
                             {state.canAdminAction && booking.status === 'PENDING' && (
                               <div className="flex gap-2 w-full mt-2 justify-center">
@@ -374,7 +413,7 @@ export default function AdminPage() {
 
                             {booking.status === 'COMPLETED' && (
                               <div className="mt-2 w-full flex items-center justify-center gap-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 py-2 px-3 rounded-xl font-black text-[9px] uppercase tracking-widest">
-                                <ShieldCheck size={14} /> Giao dịch hoàn tất
+                                <ShieldCheck size={14} /> Hoàn tất
                               </div>
                             )}
                           </div>

@@ -3,7 +3,7 @@
 "use client";
 
 import Link from "next/link";
-import { CarFront, CalendarDays, Plus, Edit, Trash2, Banknote, CheckCircle2, Clock, XCircle, EyeOff, Eye } from "lucide-react";
+import { CarFront, CalendarDays, Plus, Edit, Trash2, Banknote, CheckCircle2, Clock, XCircle, EyeOff, Eye, Handshake } from "lucide-react";
 
 export default function MyFleet({ myCars, handleDeleteCar, handleToggleCarStatus }) { // 🚀 Nhận thêm prop mới
   return (
@@ -62,6 +62,13 @@ export default function MyFleet({ myCars, handleDeleteCar, handleToggleCarStatus
                       <Link href="/partner/calendar" className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest px-6 py-2 rounded-xl transition-all italic">
                         <CalendarDays size={14} /> Quản lý lịch
                       </Link>
+                      <Link 
+  href={`/partner/contract/${car.id}`} 
+  target="_blank"
+  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors w-full"
+>
+  <Handshake size={12} /> Hợp đồng
+</Link>
                     </>
                   )}
                   {car.status === 'PENDING' && (
@@ -85,6 +92,8 @@ export default function MyFleet({ myCars, handleDeleteCar, handleToggleCarStatus
                 </div>
 
                 {/* KHU VỰC NÚT THAO TÁC (Sửa / Ẩn / Mở / Xóa) */}
+                {/* 🚀 NÚT XEM HỢP ĐỒNG ĐIỆN TỬ */}
+
                 <div className="flex sm:flex-col gap-2 w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-gray-100 pt-3 sm:pt-0 sm:pl-3">
                   <Link href={`/partner/cars/${car.id}/edit`} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all text-[10px] font-black uppercase tracking-widest">
                     <Edit size={14} /> Sửa
